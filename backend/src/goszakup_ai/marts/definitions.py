@@ -121,6 +121,7 @@ PRICE_OBSERVATION = Mart(
         r.unit_code_resolved AS unit_code,
         un.name_ru AS unit_name,
         coalesce(n.canonical_code, r.unit_code_resolved) AS unit_norm_code,
+        unn.name_ru AS unit_norm_name,
         coalesce(n.factor, 1) AS unit_factor,
         coalesce(n.dimension, 'unknown') AS unit_dimension,
         coalesce(n.comparable, true) AS unit_comparable,
@@ -143,6 +144,7 @@ PRICE_OBSERVATION = Mart(
     LEFT JOIN core.plan_point pp ON pp.id = r.resolved_pp_id
     LEFT JOIN core.ref_unit_norm n ON n.unit_code = r.unit_code_resolved
     LEFT JOIN core.ref_unit un ON un.code = r.unit_code_resolved
+    LEFT JOIN core.ref_unit unn ON unn.code = coalesce(n.canonical_code, r.unit_code_resolved)
     LEFT JOIN core.lot l ON l.id = r.lot_id
     LEFT JOIN core.ref_dict cs ON cs.dict_name = 'contract_status' AND cs.id = r.contract_status_id
     LEFT JOIN core.ref_dict tm ON tm.dict_name = 'trade_method' AND tm.id = r.fakt_trade_method_id
@@ -323,6 +325,199 @@ PROCUREMENT_EFFICIENCY = Mart(
     ("UNIQUE (customer_bin, year)",),
 )
 
+CPI_INDEX = Mart(
+    "cpi_index",
+    """
+    SELECT month, cpi_mom_pct,
+           100 * exp(sum(ln(1 + cpi_mom_pct / 100)) OVER (ORDER BY month)) AS idx
+    FROM core.ref_cpi
+    WHERE cpi_mom_pct IS NOT NULL
+    """,
+    ("UNIQUE (month)",),
+)
+
+REGION_PRICE_INDEX = Mart(
+    "region_price_index",
+    f"""
+    WITH base AS (
+        SELECT enstru_code, unit_norm_code, region_code, price_norm
+        FROM mart.price_observation
+        WHERE unit_comparable AND plan_link IN {RELIABLE_PLAN_LINKS}
+          AND price_norm > 0 AND region_code IS NOT NULL
+    ),
+    national AS (
+        SELECT enstru_code, unit_norm_code,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY price_norm) AS med
+        FROM base GROUP BY 1, 2
+        HAVING count(DISTINCT region_code) >= 2
+    ),
+    regional AS (
+        SELECT enstru_code, unit_norm_code, region_code,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY price_norm) AS med
+        FROM base GROUP BY 1, 2, 3
+        HAVING count(*) >= 3
+    ),
+    ratios AS (
+        SELECT r.region_code, ln(r.med / n.med) AS log_ratio
+        FROM regional r JOIN national n USING (enstru_code, unit_norm_code)
+    )
+    SELECT region_code,
+           count(*) AS n_codes,
+           exp(percentile_cont(0.5) WITHIN GROUP (ORDER BY log_ratio)) AS raw_k,
+           exp(count(*)::float8 / (count(*) + 20)
+               * percentile_cont(0.5) WITHIN GROUP (ORDER BY log_ratio)) AS k
+    FROM ratios
+    GROUP BY region_code
+    """,
+    ("UNIQUE (region_code)",),
+)
+
+SEASON_INDEX = Mart(
+    "season_index",
+    f"""
+    WITH base AS (
+        SELECT o.enstru_code, o.unit_norm_code, o.fin_year,
+               extract(month FROM o.sign_date)::int AS month,
+               o.price_norm * 100 / coalesce(ci.idx, 100) AS real_price
+        FROM mart.price_observation o
+        LEFT JOIN mart.cpi_index ci ON ci.month = o.sign_month
+        WHERE o.unit_comparable AND o.plan_link IN {RELIABLE_PLAN_LINKS}
+          AND o.price_norm > 0 AND o.sign_date IS NOT NULL
+    ),
+    yearly AS (
+        SELECT enstru_code, unit_norm_code, fin_year,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY real_price) AS med
+        FROM base GROUP BY 1, 2, 3
+        HAVING count(*) >= 6
+    ),
+    ratios AS (
+        SELECT b.month, ln(b.real_price / y.med) AS log_ratio
+        FROM base b JOIN yearly y USING (enstru_code, unit_norm_code, fin_year)
+    )
+    SELECT month,
+           count(*) AS n_obs,
+           exp(percentile_cont(0.5) WITHIN GROUP (ORDER BY log_ratio)) AS raw_factor,
+           exp(count(*)::float8 / (count(*) + 500)
+               * percentile_cont(0.5) WITHIN GROUP (ORDER BY log_ratio)) AS factor
+    FROM ratios
+    GROUP BY month
+    """,
+    ("UNIQUE (month)",),
+)
+
+PRICE_ANOMALY = Mart(
+    "price_anomaly",
+    f"""
+    WITH obs AS (
+        SELECT o.*,
+               o.price_norm * 100 / coalesce(ci.idx, 100) AS real_price,
+               ci.idx AS cpi_idx
+        FROM mart.price_observation o
+        LEFT JOIN mart.cpi_index ci ON ci.month = o.sign_month
+        WHERE o.unit_comparable AND o.plan_link IN {RELIABLE_PLAN_LINKS}
+          AND o.price_norm > 0 AND o.quantity_norm > 0
+    ),
+    grp AS (
+        SELECT enstru_code, unit_norm_code,
+               count(*) AS n,
+               count(DISTINCT customer_bin) AS n_customers,
+               sum(real_price * quantity_norm) AS spq,
+               sum(quantity_norm) AS sq,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY ln(real_price)) AS med_log
+        FROM obs GROUP BY 1, 2
+    ),
+    disp AS (
+        SELECT o.enstru_code, o.unit_norm_code,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY abs(ln(o.real_price) - g.med_log))
+                   AS mad_log
+        FROM obs o JOIN grp g USING (enstru_code, unit_norm_code)
+        GROUP BY 1, 2
+    ),
+    scored AS (
+        SELECT o.*,
+               g.n - 1 AS peer_n,
+               g.n_customers,
+               (g.spq - o.real_price * o.quantity_norm) / nullif(g.sq - o.quantity_norm, 0)
+                   AS peer_wavg_real,
+               exp(g.med_log) AS group_median_real,
+               (ln(o.real_price) - g.med_log) / nullif(1.4826 * d.mad_log, 0) AS robust_z,
+               d.mad_log AS group_mad_log
+        FROM obs o
+        JOIN grp g USING (enstru_code, unit_norm_code)
+        JOIN disp d USING (enstru_code, unit_norm_code)
+        WHERE o.in_scope
+    )
+    SELECT unit_id, contract_id, chain_id, lot_id, lot_number, trd_buy_id, contract_number,
+           customer_bin, customer_name, supplier_biin, supplier_name, sign_date, fin_year,
+           enstru_code, enstru_name, item_name, unit_norm_code, unit_name, unit_dimension,
+           plan_link, quantity_norm, price_norm, real_price, amount_kzt, region_name,
+           locality_name, trade_method, is_single_source, cpi_idx IS NOT NULL AS cpi_adjusted,
+           peer_n, n_customers, peer_wavg_real, group_median_real, robust_z, group_mad_log,
+           real_price / nullif(peer_wavg_real, 0) - 1 AS deviation,
+           (real_price - peer_wavg_real) * quantity_norm * coalesce(cpi_idx, 100) / 100
+               AS overpayment_kzt
+    FROM scored
+    """,
+    ("UNIQUE (unit_id)", "(customer_bin, fin_year)", "(enstru_code)", "(deviation)"),
+)
+
+VOLUME_ANOMALY = Mart(
+    "volume_anomaly",
+    """
+    WITH v AS (
+        SELECT y.customer_bin, y.enstru_code, coalesce(y.unit_norm_code, '') AS unit_norm_code,
+               y.year,
+               coalesce(y.plan_quantity, y.fact_quantity) AS quantity,
+               coalesce(y.plan_amount, y.fact_amount) AS amount,
+               CASE WHEN y.plan_quantity IS NOT NULL THEN 'plan' ELSE 'fact' END AS source
+        FROM mart.volume_yearly y
+        LEFT JOIN core.ref_unit_norm n ON n.canonical_code = y.unit_norm_code
+            AND n.unit_code = y.unit_norm_code
+        WHERE coalesce(y.plan_quantity, y.fact_quantity) > 0
+          AND coalesce(n.comparable, true)
+    ),
+    baseline AS (
+        SELECT c.customer_bin, c.enstru_code, c.unit_norm_code, c.year,
+               avg(p.quantity) AS baseline_quantity,
+               avg(p.amount) AS baseline_amount,
+               count(*) AS baseline_years
+        FROM v c
+        JOIN v p ON p.customer_bin = c.customer_bin AND p.enstru_code = c.enstru_code
+                AND p.unit_norm_code = c.unit_norm_code AND p.year < c.year
+        GROUP BY 1, 2, 3, 4
+    ),
+    ratios AS (
+        SELECT v.*, b.baseline_quantity, b.baseline_amount, b.baseline_years,
+               v.quantity / b.baseline_quantity AS ratio
+        FROM v JOIN baseline b USING (customer_bin, enstru_code, unit_norm_code, year)
+        WHERE b.baseline_quantity > 0
+    ),
+    peers AS (
+        SELECT enstru_code, unit_norm_code, year,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY ratio) AS peer_ratio,
+               count(*) AS peer_n
+        FROM ratios GROUP BY 1, 2, 3
+    )
+    SELECT r.customer_bin, sb.name_ru AS customer_name, r.enstru_code, en.name_ru AS enstru_name,
+           nullif(r.unit_norm_code, '') AS unit_norm_code, un.name_ru AS unit_name,
+           r.year, r.source,
+           r.quantity, r.amount, r.baseline_quantity, r.baseline_amount, r.baseline_years,
+           r.ratio,
+           p.peer_ratio, p.peer_n - 1 AS peer_n,
+           CASE WHEN p.peer_n >= 4 THEN r.ratio / nullif(p.peer_ratio, 0) END AS excess_ratio,
+           (r.quantity - r.baseline_quantity) * r.amount / nullif(r.quantity, 0) AS extra_amount
+    FROM ratios r
+    JOIN peers p USING (enstru_code, unit_norm_code, year)
+    LEFT JOIN meta.scope_bin sb ON sb.bin = r.customer_bin
+    LEFT JOIN core.ref_unit un ON un.code = r.unit_norm_code
+    LEFT JOIN LATERAL (
+        SELECT e.name_ru FROM core.ref_enstru e
+        WHERE e.code = r.enstru_code ORDER BY e.id DESC LIMIT 1
+    ) en ON true
+    """,
+    ("(customer_bin, year)", "(ratio)", "(enstru_code)"),
+)
+
 MARTS: tuple[Mart, ...] = (
     CONTRACT_CURRENT,
     ENSTRU_UNIT,
@@ -330,4 +525,9 @@ MARTS: tuple[Mart, ...] = (
     PRICE_BENCHMARK,
     VOLUME_YEARLY,
     PROCUREMENT_EFFICIENCY,
+    CPI_INDEX,
+    REGION_PRICE_INDEX,
+    SEASON_INDEX,
+    PRICE_ANOMALY,
+    VOLUME_ANOMALY,
 )

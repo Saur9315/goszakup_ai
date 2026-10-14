@@ -121,6 +121,14 @@ CHECKS: tuple[Check, ...] = (
         "currency_code IS NOT NULL AND currency_code <> 'KZT'",
     ),
     Check(
+        "cpi_month_missing",
+        "contract_unit",
+        "info",
+        "Для месяца подписания ещё нет опубликованного ИПЦ: инфляционная поправка неполная",
+        "sign_month IS NOT NULL AND NOT EXISTS "
+        "(SELECT 1 FROM mart.cpi_index ci WHERE ci.month = mart.price_observation.sign_month)",
+    ),
+    Check(
         "plan_point_without_enstru",
         "plan_point",
         "warning",

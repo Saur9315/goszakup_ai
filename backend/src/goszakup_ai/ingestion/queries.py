@@ -80,7 +80,8 @@ TRD_BUY = EntitySpec("trd_buy", "TrdBuy", "TrdBuyFiltersInput", TRD_BUY_FIELDS)
 BENCHMARK_CONTRACT_FIELDS = contract_fields(f"Plans {{ {PLAN_POINT_FIELDS} }}")
 
 BENCHMARK_CONTRACT_QUERY = (
-    "query($filter: ContractFiltersInput, $units: ContractUnitsFiltersInput, $after: Int) { "
-    "Contract(filter: $filter, contractUnitsFilter: $units, limit: 200, after: $after) { "
+    "query($filter: ContractFiltersInput, $units: ContractUnitsFiltersInput, "
+    "$limit: Int, $after: Int) { "
+    "Contract(filter: $filter, contractUnitsFilter: $units, limit: $limit, after: $after) { "
     f"{BENCHMARK_CONTRACT_FIELDS} }} }}"
 )

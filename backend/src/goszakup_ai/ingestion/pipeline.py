@@ -236,12 +236,22 @@ class Ingestor:
             raise RuntimeError(f"{len(failed)} of {len(codes)} benchmark codes failed")
 
     async def _load_benchmark_code(self, code: str, *, max_contracts: int, full: bool) -> None:
-        scope_key = f"bench:{code}"
+        for year in self.years:
+            await self._load_benchmark_code_year(code, year, max_contracts=max_contracts, full=full)
+
+    async def _load_benchmark_code_year(
+        self, code: str, year: int, *, max_contracts: int, full: bool
+    ) -> None:
+        scope_key = f"bench:{code}:{year}"
         since = None if full else await self._last_index_date(BENCHMARK_ENTITY, scope_key)
-        flt: dict[str, Any] = {"signDate": [f"{min(self.years)}-01-01", f"{max(self.years)}-12-31"]}
+        flt: dict[str, Any] = {"signDate": [f"{year}-01-01", f"{year}-12-31"]}
         if since is not None:
             flt["indexDate"] = [since.strftime("%Y-%m-%d %H:%M:%S"), OPEN_END]
-        variables = {"filter": flt, "units": {"refEnstruCode": [code]}}
+        variables = {
+            "filter": flt,
+            "units": {"refEnstruCode": [code]},
+            "limit": min(200, max_contracts),
+        }
         total = 0
         max_index: datetime | None = None
         async for page in self.client.graphql_pages(

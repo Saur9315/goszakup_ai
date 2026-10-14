@@ -4,16 +4,22 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
+from pydantic import BaseModel
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
+from goszakup_ai.analytics.anomalies import price_anomalies, volume_anomalies
+from goszakup_ai.analytics.cpi import fetch_cpi_from_taldau, read_cpi_csv
+from goszakup_ai.analytics.repository import fair_price_for_lot
 from goszakup_ai.core.config import get_settings
 from goszakup_ai.core.scope import TARGET_BINS, TARGET_YEARS
+from goszakup_ai.db.models import RefCpi
 from goszakup_ai.db.session import make_engine, make_sessionmaker
 from goszakup_ai.ingestion.pipeline import Ingestor
+from goszakup_ai.ingestion.store import upsert
 from goszakup_ai.marts.build import build_marts, refresh_marts
 from goszakup_ai.ows import OwsClient
 from goszakup_ai.quality.run import CheckResult, run_checks
@@ -25,6 +31,8 @@ marts_app = typer.Typer(no_args_is_help=True)
 app.add_typer(marts_app, name="marts", help="Analytical marts (materialized views)")
 dq_app = typer.Typer(no_args_is_help=True)
 app.add_typer(dq_app, name="dq", help="Data quality checks")
+analyze_app = typer.Typer(no_args_is_help=True)
+app.add_typer(analyze_app, name="analyze", help="Run analytics and print JSON results")
 
 STATUS_TABLES = (
     "core.subject",
@@ -134,7 +142,9 @@ def ingest_benchmark(
     coverage: Annotated[
         float, typer.Option(help="Share of goods spend the codes must cover")
     ] = 0.95,
-    max_contracts: Annotated[int, typer.Option(help="Most recent contracts per code")] = 200,
+    max_contracts: Annotated[
+        int, typer.Option(help="Most recent contracts per code and year")
+    ] = 100,
     full: Annotated[bool, typer.Option("--full", help="Ignore saved sync state")] = False,
 ) -> None:
     command = f"ingest benchmark coverage={coverage} max={max_contracts}"
@@ -173,6 +183,97 @@ async def _with_engine(action: Callable[[AsyncEngine], Awaitable[None]]) -> None
         await action(engine)
     finally:
         await engine.dispose()
+
+
+@ingest_app.command("cpi", help="Monthly CPI: bundled CSV, then newer months from Taldau")
+def ingest_cpi(
+    taldau: Annotated[bool, typer.Option(help="Fetch months after the CSV from Taldau")] = True,
+) -> None:
+    async def job(engine: AsyncEngine) -> None:
+        rows = read_cpi_csv()
+        if taldau:
+            latest = max(r["month"] for r in rows)
+            fresh = [r for r in await fetch_cpi_from_taldau(latest) if r["month"] > latest]
+            rows += fresh
+            typer.echo(f"taldau: {len(fresh)} new months")
+        async with AsyncSession(engine) as session, session.begin():
+            await upsert(session, RefCpi, rows)
+        typer.echo(f"cpi: {len(rows)} months, {rows[0]['month']} .. {rows[-1]['month']}")
+
+    asyncio.run(_with_engine(job))
+
+
+async def _analyze(
+    action: Callable[[AsyncSession], Awaitable[BaseModel | list[BaseModel]]],
+) -> None:
+    async def job(engine: AsyncEngine) -> None:
+        async with AsyncSession(engine) as session:
+            result = await action(session)
+        items = result if isinstance(result, list) else [result]
+        for item in items:
+            typer.echo(item.model_dump_json(indent=2))
+
+    await _with_engine(job)
+
+
+@analyze_app.command("fair-price", help="Fair Price of a lot (lot number like 54949500-ЗЦП4 or id)")
+def analyze_fair_price(lot: str) -> None:
+    asyncio.run(_analyze(lambda s: fair_price_for_lot(s, lot)))  # type: ignore[arg-type,return-value]
+
+
+@analyze_app.command("price-anomalies", help="Prices deviating from the ENSTRU weighted average")
+def analyze_price_anomalies(
+    threshold: float = 0.3,
+    direction: Annotated[str, typer.Option(help="above, below or both")] = "above",
+    bin_: Annotated[str | None, typer.Option("--bin")] = None,
+    year: int | None = None,
+    enstru: str | None = None,
+    confirm_z: float = 2.0,
+    all_: Annotated[
+        bool, typer.Option("--all", help="Include unconfirmed (formal) matches")
+    ] = False,
+    limit: int = 20,
+) -> None:
+    dir_: Literal["above", "below", "both"] = direction  # type: ignore[assignment]
+    asyncio.run(
+        _analyze(
+            lambda s: price_anomalies(
+                s,
+                threshold=threshold,
+                direction=dir_,
+                customer_bin=bin_,
+                year=year,
+                enstru_code=enstru,
+                confirm_z=confirm_z,
+                only_confirmed=not all_,
+                limit=limit,
+            )
+        )
+    )
+
+
+@analyze_app.command(
+    "volume-anomalies", help="Unusual growth of purchased quantity vs previous years"
+)
+def analyze_volume_anomalies(
+    min_ratio: float = 1.5,
+    bin_: Annotated[str | None, typer.Option("--bin")] = None,
+    year: int | None = None,
+    min_extra_amount: float = 0.0,
+    limit: int = 20,
+) -> None:
+    asyncio.run(
+        _analyze(
+            lambda s: volume_anomalies(
+                s,
+                min_ratio=min_ratio,
+                customer_bin=bin_,
+                year=year,
+                min_extra_amount=min_extra_amount,
+                limit=limit,
+            )
+        )
+    )
 
 
 @app.command("status", help="Row counts and recent sync runs")

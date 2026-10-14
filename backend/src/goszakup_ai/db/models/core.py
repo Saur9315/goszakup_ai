@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -294,3 +294,15 @@ class ContractUnit(Base):
     exec_fakt_date: Mapped[datetime | None]
     created_at: Mapped[datetime | None]
     index_date: Mapped[datetime | None]
+
+
+class RefCpi(Base):
+    __tablename__ = "ref_cpi"
+    __table_args__ = SCHEMA
+
+    month: Mapped[date] = mapped_column(primary_key=True)
+    cpi_mom_pct: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    food_mom_pct: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    nonfood_mom_pct: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    services_mom_pct: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    source_url: Mapped[str | None] = mapped_column(Text)
