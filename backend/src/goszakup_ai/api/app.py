@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Annotated, Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
@@ -11,9 +12,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from goszakup_ai.agent.graph import Agent
+from goszakup_ai.agent.graph import Agent, open_agent
 from goszakup_ai.agent.llm import LlmConfigError
-from goszakup_ai.agent.schemas import AgentAnswer
+from goszakup_ai.agent.schemas import AgentAnswer, Turn
 from goszakup_ai.analytics.anomalies import (
     PriceAnomalyReport,
     VolumeAnomalyReport,
@@ -26,13 +27,24 @@ from goszakup_ai.core.config import get_settings
 from goszakup_ai.db.models import AnalysisRun
 from goszakup_ai.db.session import make_engine, make_sessionmaker
 
+log = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    engine = make_engine(get_settings())
+    settings = get_settings()
+    url = (settings.api_database_url or settings.database_url).get_secret_value()
+    engine = make_engine(settings, url)
     app.state.sessions = make_sessionmaker(engine)
     app.state.agent = None
-    yield
+    async with AsyncExitStack() as stack:
+        try:
+            app.state.agent = await stack.enter_async_context(
+                open_agent(settings, app.state.sessions, url)
+            )
+        except LlmConfigError as e:
+            log.warning("agent disabled: %s", e)
+        yield
     await engine.dispose()
 
 
@@ -56,7 +68,7 @@ async def session(request: Request) -> AsyncIterator[AsyncSession]:
 
 def agent(request: Request) -> Agent:
     if request.app.state.agent is None:
-        request.app.state.agent = Agent(get_settings(), request.app.state.sessions)
+        raise HTTPException(status_code=503, detail="LLM is not configured")
     return request.app.state.agent  # type: ignore[no-any-return]
 
 
@@ -65,6 +77,7 @@ Session = Annotated[AsyncSession, Depends(session)]
 
 class AskRequest(BaseModel):
     question: str = Field(min_length=3, max_length=2000)
+    thread_id: uuid.UUID | None = None
 
 
 @app.get("/api/health")
@@ -75,7 +88,12 @@ async def health(db: Session) -> dict[str, str]:
 
 @app.post("/api/ask")
 async def ask(body: AskRequest, a: Annotated[Agent, Depends(agent)]) -> AgentAnswer:
-    return await a.ask(body.question)
+    return await a.ask(body.question, str(body.thread_id) if body.thread_id else None)
+
+
+@app.get("/api/threads/{thread_id}")
+async def thread_history(thread_id: uuid.UUID, a: Annotated[Agent, Depends(agent)]) -> list[Turn]:
+    return await a.history(str(thread_id))
 
 
 @app.get("/api/runs/{run_id}")

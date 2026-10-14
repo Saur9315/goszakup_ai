@@ -279,21 +279,79 @@ def analyze_volume_anomalies(
 @app.command("ask", help="Ask the AI agent a question (RU/KZ)")
 def ask(
     question: str,
+    thread: Annotated[str | None, typer.Option("--thread", help="Continue a dialog")] = None,
     as_json: Annotated[bool, typer.Option("--json", help="Print the full JSON answer")] = False,
 ) -> None:
-    from goszakup_ai.agent.graph import Agent
+    from goszakup_ai.agent.graph import open_agent
 
     async def job(engine: AsyncEngine) -> None:
-        agent = Agent(get_settings(), make_sessionmaker(engine))
-        answer = await agent.ask(question)
+        settings = get_settings()
+        url = settings.database_url.get_secret_value()
+        async with open_agent(settings, make_sessionmaker(engine), url) as agent:
+            answer = await agent.ask(question, thread)
         if as_json:
             typer.echo(answer.model_dump_json(indent=2))
-        else:
-            typer.echo(answer.markdown)
-            typer.echo(
-                f"\nrun {answer.run_id} · {answer.model} · {answer.latency_ms} ms · "
-                f"intent={answer.params.intent}"
+            return
+        typer.echo(answer.markdown)
+        typer.echo(
+            f"\nthread {answer.thread_id} · run {answer.run_id} · {answer.model} · "
+            f"{answer.latency_ms} ms · intent={answer.params.intent} · {answer.kind}"
+        )
+
+    asyncio.run(_with_engine(job))
+
+
+@app.command("chat", help="Interactive dialog with the agent (empty line to exit)")
+def chat(thread: Annotated[str | None, typer.Option("--thread")] = None) -> None:
+    import uuid
+
+    from goszakup_ai.agent.graph import open_agent
+
+    thread_id = thread or str(uuid.uuid4())
+
+    async def job(engine: AsyncEngine) -> None:
+        settings = get_settings()
+        url = settings.database_url.get_secret_value()
+        async with open_agent(settings, make_sessionmaker(engine), url) as agent:
+            typer.echo(f"thread {thread_id}")
+            while question := (await asyncio.to_thread(input, "\n> ")).strip():
+                answer = await agent.ask(question, thread_id)
+                typer.echo(answer.markdown if answer.kind == "answer" else answer.verdict)
+
+    asyncio.run(_with_engine(job))
+
+
+db_app = typer.Typer(no_args_is_help=True)
+app.add_typer(db_app, name="db", help="Database administration")
+
+
+@db_app.command("create-api-user", help="Create the login user from API_DATABASE_URL")
+def create_api_user() -> None:
+    from sqlalchemy import make_url
+
+    settings = get_settings()
+    if settings.api_database_url is None:
+        raise typer.BadParameter("API_DATABASE_URL is not set")
+    url = make_url(settings.api_database_url.get_secret_value())
+
+    async def job(engine: AsyncEngine) -> None:
+        async with engine.begin() as conn:
+            params = {"u": url.username, "p": url.password}
+            exists = await conn.scalar(text("SELECT 1 FROM pg_roles WHERE rolname = :u"), params)
+            verb = "ALTER" if exists else "CREATE"
+            statement = await conn.scalar(
+                text(
+                    f"SELECT format('{verb} ROLE %I LOGIN PASSWORD %L', "
+                    "CAST(:u AS text), CAST(:p AS text))"
+                ),
+                params,
             )
+            grant = await conn.scalar(
+                text("SELECT format('GRANT goszakup_api TO %I', CAST(:u AS text))"), params
+            )
+            await conn.exec_driver_sql(statement)
+            await conn.exec_driver_sql(grant)
+        typer.echo(f"user {url.username}: {verb.lower()}d, granted goszakup_api")
 
     asyncio.run(_with_engine(job))
 

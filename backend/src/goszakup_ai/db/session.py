@@ -8,9 +8,9 @@ from sqlalchemy.ext.asyncio import (
 from goszakup_ai.core.config import Settings
 
 
-def make_engine(settings: Settings) -> AsyncEngine:
+def make_engine(settings: Settings, url: str | None = None) -> AsyncEngine:
     return create_async_engine(
-        settings.database_url.get_secret_value(),
+        url or settings.database_url.get_secret_value(),
         pool_size=settings.ingest_concurrency + 2,
         pool_pre_ping=True,
     )

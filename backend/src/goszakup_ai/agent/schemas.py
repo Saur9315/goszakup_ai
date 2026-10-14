@@ -5,7 +5,16 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-Intent = Literal["search", "compare", "analytics", "price_anomaly", "volume_anomaly", "fair_price"]
+Intent = Literal[
+    "search",
+    "compare",
+    "analytics",
+    "price_anomaly",
+    "volume_anomaly",
+    "fair_price",
+    "out_of_scope",
+]
+AnswerKind = Literal["answer", "clarification"]
 Language = Literal["ru", "kk"]
 CompareBy = Literal["customer", "year", "region", "supplier", "trade_method"]
 
@@ -19,7 +28,8 @@ class QuestionAnalysis(BaseModel):
             "analytics — эффективность и общая картина закупок организации; "
             "price_anomaly — отклонения цен "
             "от средних; volume_anomaly — нетипичный рост количества по сравнению с прошлыми "
-            "годами; fair_price — справедливость цены конкретного лота"
+            "годами; fair_price — справедливость цены конкретного лота; "
+            "out_of_scope — вопрос не о государственных закупках"
         )
     )
     bins: list[str] = Field(
@@ -99,8 +109,22 @@ class Verification(BaseModel):
         return self.numbers_grounded / self.numbers_total if self.numbers_total else 1.0
 
 
+class Turn(BaseModel):
+    question: str
+    intent: Intent
+    customer_bins: list[str] = Field(default_factory=list)
+    items: list[str] = Field(default_factory=list)
+    enstru_codes: list[str] = Field(default_factory=list)
+    lot_numbers: list[str] = Field(default_factory=list)
+    years: list[int] = Field(default_factory=list)
+    region: str | None = None
+    answer: str = ""
+
+
 class AgentAnswer(BaseModel):
     run_id: str
+    thread_id: str
+    kind: AnswerKind = "answer"
     question: str
     params: ResolvedParams
     tool_results: list[ToolResult]
@@ -111,3 +135,7 @@ class AgentAnswer(BaseModel):
     data_as_of: datetime | None
     model: str
     latency_ms: int
+    llm_fallback: bool = False
+    usage: dict[str, Any] = Field(default_factory=dict)
+    timings_ms: dict[str, int] = Field(default_factory=dict)
+    prompt_version: str = ""

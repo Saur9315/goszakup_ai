@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     )
 
     database_url: SecretStr
+    api_database_url: SecretStr | None = None
 
     ows_token: SecretStr | None = None
     ows_base_url: str = "https://ows.goszakup.gov.kz"
@@ -28,6 +29,7 @@ class Settings(BaseSettings):
     ingest_concurrency: int = 4
 
     llm_provider: Literal["openai", "qwen", "gemini"] = "openai"
+    llm_fallback_provider: Literal["openai", "qwen", "gemini"] | None = None
     llm_temperature: float = 0.0
     llm_timeout_sec: float = 120.0
     llm_max_concurrency: int | None = None

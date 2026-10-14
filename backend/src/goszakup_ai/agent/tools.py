@@ -502,6 +502,28 @@ async def fair_price(session: AsyncSession, p: ResolvedParams) -> list[ToolResul
     return results
 
 
+SUGGEST_LOTS_SQL = """
+SELECT lot_number, max(item_name) AS item, max(customer_name) AS customer,
+       max(price_norm) AS price, max(unit_norm_name) AS unit, sum(amount_kzt) AS amount
+FROM mart.price_observation
+WHERE {where} AND lot_number IS NOT NULL
+GROUP BY lot_number
+ORDER BY amount DESC NULLS LAST
+LIMIT 5
+"""
+
+
+async def suggest_lots(session: AsyncSession, p: ResolvedParams) -> list[str]:
+    if not (p.customer_bins or p.enstru_codes):
+        return []
+    where, params = _where(p, market=False)
+    rows = await session.execute(text(SUGGEST_LOTS_SQL.format(where=where)), params)
+    return [
+        f"{r.lot_number} — {r.item}, {r.customer}, {money(r.price)} / {r.unit or 'ед.'}"
+        for r in rows
+    ]
+
+
 ToolFn = Callable[[AsyncSession, ResolvedParams], Awaitable[ToolResult | list[ToolResult]]]
 
 ROUTES: dict[Intent, list[ToolFn]] = {
@@ -511,6 +533,7 @@ ROUTES: dict[Intent, list[ToolFn]] = {
     "price_anomaly": [price_anomaly],
     "volume_anomaly": [volume_anomaly],
     "fair_price": [fair_price],
+    "out_of_scope": [],
 }
 
 

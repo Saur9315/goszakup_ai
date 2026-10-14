@@ -18,8 +18,13 @@ class LlmConfigError(RuntimeError):
     pass
 
 
-def make_chat_model(settings: Settings) -> tuple[ChatOpenAI, str, StructuredMethod]:
-    provider = settings.llm_provider
+Provider = Literal["openai", "qwen", "gemini"]
+
+
+def make_chat_model(
+    settings: Settings, provider: Provider | None = None
+) -> tuple[ChatOpenAI, str, StructuredMethod]:
+    provider = provider or settings.llm_provider
     key, model, base_url = {
         "openai": (settings.openai_api_key, settings.openai_model, settings.openai_base_url),
         "qwen": (settings.qwen_api_key, settings.qwen_model, settings.qwen_base_url),

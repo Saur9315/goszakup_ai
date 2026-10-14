@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from goszakup_ai.agent.schemas import Fact, ResolvedParams, ToolResult
+from goszakup_ai.agent.schemas import Fact, Language, ResolvedParams, ToolResult, Turn
+
+PROMPT_VERSION = "2026-10-14.3"
+HISTORY_TURNS = 3
 
 UNDERSTAND_SYSTEM = """\
 Ты разбираешь вопросы о государственных закупках Республики Казахстан (портал goszakup.gov.kz).
@@ -14,6 +17,10 @@ UNDERSTAND_SYSTEM = """\
   («дизельное топливо», «говядина», «ноутбук»); казахские названия переведи на русский;
 - номера лотов возвращай как в вопросе (например 54949500-ЗЦП4);
 - порог отклонения — в процентах (например 30).
+
+Если вопрос продолжает диалог («а за 2024 год?», «а у ЦКБ?», «покажи подробнее»),
+возьми недостающие параметры (тип вопроса, организации, товары, лоты, годы) из предыдущих
+вопросов диалога ниже.
 
 Организации выборки (БИН — название):
 {orgs}
@@ -60,13 +67,67 @@ def facts_block(facts: list[Fact]) -> str:
 
 
 def compose_user(
-    question: str, p: ResolvedParams, results: list[ToolResult], facts: list[Fact]
+    question: str,
+    p: ResolvedParams,
+    results: list[ToolResult],
+    facts: list[Fact],
+    previous_question: str | None = None,
 ) -> str:
     limitations = sorted({lim for r in results for lim in r.limitations})
+    context = (
+        f"Это продолжение диалога, предыдущий вопрос: «{previous_question}». "
+        "Ответь на тот же показатель для новых условий.\n"
+        if previous_question
+        else ""
+    )
     return (
-        f"Вопрос: {question}\n\n"
+        f"{context}Вопрос: {question}\n\n"
         f"Параметры:\n{params_block(p)}\n\n"
         f"Инструменты: {'; '.join(r.title for r in results)}\n\n"
         f"Факты (id | показатель | значение):\n{facts_block(facts)}\n\n"
         f"Ограничения:\n" + ("\n".join(f"- {x}" for x in limitations) or "- нет")
     )
+
+
+def history_block(history: list[Turn]) -> str:
+    if not history:
+        return ""
+    lines = ["Предыдущие вопросы диалога (от старых к новым):"]
+    for t in history[-HISTORY_TURNS:]:
+        parts = [f"тип={t.intent}"]
+        if t.customer_bins:
+            parts.append(f"БИН={','.join(t.customer_bins)}")
+        if t.items:
+            parts.append(f"товары={','.join(t.items)}")
+        if t.lot_numbers:
+            parts.append(f"лоты={','.join(t.lot_numbers)}")
+        if t.years:
+            parts.append(f"годы={','.join(map(str, t.years))}")
+        if t.region:
+            parts.append(f"регион={t.region}")
+        lines.append(f"- «{t.question}» ({'; '.join(parts)}) → {t.answer[:200]}")
+    return "\n".join(lines)
+
+
+CLARIFICATIONS: dict[str, dict[Language, str]] = {
+    "out_of_scope": {
+        "ru": "Я отвечаю на вопросы о государственных закупках 27 организаций за 2024–2026 годы: "
+        "поиск и сравнение закупок, аналитика, аномалии цен и объёмов, справедливость цены лота.",
+        "kk": "Мен 2024–2026 жылдардағы 27 ұйымның мемлекеттік сатып алулары туралы сұрақтарға "
+        "жауап беремін: іздеу және салыстыру, талдау, баға мен көлем ауытқулары, лот бағасының "
+        "әділдігі.",
+    },
+    "need_lot": {
+        "ru": "Для оценки справедливости цены нужен номер лота (например, 54949500-ЗЦП4).",
+        "kk": "Бағаның әділдігін бағалау үшін лот нөмірі қажет (мысалы, 54949500-ЗЦП4).",
+    },
+    "suggest_lots": {
+        "ru": "Возможно, подойдёт один из лотов:",
+        "kk": "Мүмкін, мына лоттардың бірі сәйкес келеді:",
+    },
+    "unknown_item": {
+        "ru": "Не нашёл в данных товар или услугу «{items}». Уточните название, например как в "
+        "объявлении о закупке.",
+        "kk": "Деректерден «{items}» тауарын немесе қызметін таппадым. Атауын нақтылаңыз.",
+    },
+}
