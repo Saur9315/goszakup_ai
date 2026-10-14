@@ -1,0 +1,96 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: goszakup-sync
+spec:
+  schedule: "0 */6 * * *"
+  timeZone: Asia/Almaty
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: goszakup-sync
+            goszakup/db-client: "true"
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+          containers:
+            - name: sync
+              image: goszakup-backend
+              args: ["sync"]
+              envFrom:
+                - configMapRef:
+                    name: goszakup-config
+              env:
+                - name: DATABASE_URL
+                  valueFrom: {secretKeyRef: {name: goszakup-secrets, key: DATABASE_URL}}
+                - name: OWS_TOKEN
+                  valueFrom: {secretKeyRef: {name: goszakup-secrets, key: OWS_TOKEN}}
+              resources:
+                requests: {cpu: 250m, memory: 512Mi}
+                limits: {memory: 2Gi}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: goszakup-benchmark
+spec:
+  schedule: "0 2 * * 0"
+  timeZone: Asia/Almaty
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: goszakup-benchmark
+            goszakup/db-client: "true"
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+          containers:
+            - name: benchmark
+              image: goszakup-backend
+              args: ["ingest", "benchmark"]
+              envFrom:
+                - configMapRef:
+                    name: goszakup-config
+              env:
+                - name: DATABASE_URL
+                  valueFrom: {secretKeyRef: {name: goszakup-secrets, key: DATABASE_URL}}
+                - name: OWS_TOKEN
+                  valueFrom: {secretKeyRef: {name: goszakup-secrets, key: OWS_TOKEN}}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: goszakup-cpi
+spec:
+  schedule: "0 6 3 * *"
+  timeZone: Asia/Almaty
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: goszakup-cpi
+            goszakup/db-client: "true"
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+          containers:
+            - name: cpi
+              image: goszakup-backend
+              args: ["ingest", "cpi"]
+              env:
+                - name: DATABASE_URL
+                  valueFrom: {secretKeyRef: {name: goszakup-secrets, key: DATABASE_URL}}
+                - name: OWS_TOKEN
+                  valueFrom: {secretKeyRef: {name: goszakup-secrets, key: OWS_TOKEN}}

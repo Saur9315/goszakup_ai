@@ -1,8 +1,17 @@
 name: goszakup
 
+x-backend: &backend
+  build:
+    context: ./backend
+  image: goszakup-backend:latest
+  restart: unless-stopped
+
+x-owner-db: &owner-db
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
 services:
   postgres:
-    image: pgvector/pgvector:pg17
+    image: pgvector/pgvector:0.8.7-pg17
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -18,5 +27,77 @@ services:
       timeout: 3s
       retries: 10
 
+  migrate:
+    <<: *backend
+    restart: "no"
+    command: ["db", "migrate"]
+    environment:
+      <<: *owner-db
+      API_DATABASE_URL: postgresql+asyncpg://goszakup_api_user:${API_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    <<: *backend
+    command: ["schedule"]
+    environment:
+      <<: *owner-db
+      OWS_TOKEN: ${OWS_TOKEN}
+      OWS_BASE_URL: ${OWS_BASE_URL:-https://ows.goszakup.gov.kz}
+      OWS_RATE_LIMIT_PER_SEC: ${OWS_RATE_LIMIT_PER_SEC:-5}
+      SYNC_INTERVAL_HOURS: ${SYNC_INTERVAL_HOURS:-6}
+      BENCHMARK_INTERVAL_DAYS: ${BENCHMARK_INTERVAL_DAYS:-7}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  api:
+    <<: *backend
+    command: ["serve", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://goszakup_api_user:${API_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_FALLBACK_PROVIDER: ${LLM_FALLBACK_PROVIDER:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.4-mini}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      QWEN_API_KEY: ${QWEN_API_KEY:-}
+      QWEN_MODEL: ${QWEN_MODEL:-qwen3-8}
+      QWEN_BASE_URL: ${QWEN_BASE_URL:-https://llm.alem.ai/v1}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  vllm:
+    profiles: ["local-llm"]
+    image: vllm/vllm-openai:v0.31.0
+    restart: unless-stopped
+    command:
+      - --model=${VLLM_MODEL:-Qwen/Qwen3-8B-AWQ}
+      - --served-model-name=local-llm
+      - --max-model-len=${VLLM_MAX_MODEL_LEN:-8192}
+      - --gpu-memory-utilization=0.90
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+    ports:
+      - "127.0.0.1:8001:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
 volumes:
   pgdata:
+  hf-cache:

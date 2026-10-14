@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: goszakup
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres.yaml
+  - migrate-job.yaml
+  - api.yaml
+  - cronjobs.yaml
+  - networkpolicy.yaml
+
+images:
+  - name: goszakup-backend
+    newName: registry.local/goszakup-backend
+    newTag: "0.1.0"
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: goszakup-ai

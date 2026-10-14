@@ -100,18 +100,19 @@ def _print_checks(results: list[CheckResult]) -> None:
         )
 
 
+async def _sync() -> None:
+    run_id = await _run("ingest scope (sync)", lambda i: i.load_scope(list(TARGET_BINS)))
+    engine = make_engine(get_settings())
+    try:
+        await refresh_marts(engine)
+        _print_checks(await run_checks(engine, run_id))
+    finally:
+        await engine.dispose()
+
+
 @app.command("sync", help="Scheduled job: incremental ingest, refresh marts, run DQ checks")
 def sync() -> None:
-    async def job() -> None:
-        run_id = await _run("ingest scope (sync)", lambda i: i.load_scope(list(TARGET_BINS)))
-        engine = make_engine(get_settings())
-        try:
-            await refresh_marts(engine)
-            _print_checks(await run_checks(engine, run_id))
-        finally:
-            await engine.dispose()
-
-    asyncio.run(job())
+    asyncio.run(_sync())
 
 
 @dq_app.command("run", help="Run data quality checks and store results")
@@ -185,22 +186,30 @@ async def _with_engine(action: Callable[[AsyncEngine], Awaitable[None]]) -> None
         await engine.dispose()
 
 
-@ingest_app.command("cpi", help="Monthly CPI: bundled CSV, then newer months from Taldau")
-def ingest_cpi(
-    taldau: Annotated[bool, typer.Option(help="Fetch months after the CSV from Taldau")] = True,
-) -> None:
+async def _load_cpi(taldau: bool = True) -> None:
     async def job(engine: AsyncEngine) -> None:
         rows = read_cpi_csv()
         if taldau:
             latest = max(r["month"] for r in rows)
-            fresh = [r for r in await fetch_cpi_from_taldau(latest) if r["month"] > latest]
+            try:
+                fresh = [r for r in await fetch_cpi_from_taldau(latest) if r["month"] > latest]
+            except Exception as e:
+                fresh = []
+                typer.echo(f"taldau unavailable, using bundled CSV only: {e!r}")
             rows += fresh
             typer.echo(f"taldau: {len(fresh)} new months")
         async with AsyncSession(engine) as session, session.begin():
             await upsert(session, RefCpi, rows)
         typer.echo(f"cpi: {len(rows)} months, {rows[0]['month']} .. {rows[-1]['month']}")
 
-    asyncio.run(_with_engine(job))
+    await _with_engine(job)
+
+
+@ingest_app.command("cpi", help="Monthly CPI: bundled CSV, then newer months from Taldau")
+def ingest_cpi(
+    taldau: Annotated[bool, typer.Option(help="Fetch months after the CSV from Taldau")] = True,
+) -> None:
+    asyncio.run(_load_cpi(taldau))
 
 
 async def _analyze(
@@ -325,6 +334,21 @@ db_app = typer.Typer(no_args_is_help=True)
 app.add_typer(db_app, name="db", help="Database administration")
 
 
+@db_app.command("migrate", help="Apply migrations and create the API login user")
+def db_migrate() -> None:
+    from pathlib import Path
+
+    from alembic import command
+    from alembic.config import Config
+
+    ini = Path.cwd() / "alembic.ini"
+    if not ini.exists():
+        raise typer.BadParameter(f"{ini} not found: run from the backend directory")
+    command.upgrade(Config(str(ini)), "head")
+    if get_settings().api_database_url is not None:
+        create_api_user()
+
+
 @db_app.command("create-api-user", help="Create the login user from API_DATABASE_URL")
 def create_api_user() -> None:
     from sqlalchemy import make_url
@@ -351,7 +375,8 @@ def create_api_user() -> None:
             )
             await conn.exec_driver_sql(statement)
             await conn.exec_driver_sql(grant)
-        typer.echo(f"user {url.username}: {verb.lower()}d, granted goszakup_api")
+        action = "updated" if exists else "created"
+        typer.echo(f"user {url.username}: {action}, granted goszakup_api")
 
     asyncio.run(_with_engine(job))
 
@@ -415,6 +440,77 @@ def serve(host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> No
     import uvicorn
 
     uvicorn.run("goszakup_ai.api.app:app", host=host, port=port, reload=reload)
+
+
+async def _bootstrap(full: bool, benchmark: bool) -> None:
+    await _run("ingest refs", lambda i: i.load_refs())
+    await _load_cpi()
+    await _run(
+        "ingest scope --full" if full else "ingest scope",
+        lambda i: i.load_scope(list(TARGET_BINS), full=full),
+    )
+    await _with_engine(build_marts)
+    if benchmark:
+        await _run(
+            "ingest benchmark",
+            lambda i: i.load_benchmark(coverage=0.95, max_contracts=200, full=full),
+        )
+        await _with_engine(refresh_marts)
+
+    async def checks(engine: AsyncEngine) -> None:
+        _print_checks(await run_checks(engine))
+
+    await _with_engine(checks)
+
+
+@app.command("bootstrap", help="First full load: refs, CPI, 27 BINs, marts, benchmark, DQ")
+def bootstrap(
+    benchmark: Annotated[bool, typer.Option(help="Also load the price benchmark (~1 h)")] = True,
+) -> None:
+    asyncio.run(_bootstrap(full=True, benchmark=benchmark))
+
+
+@app.command("schedule", help="Long-running worker: periodic sync and weekly benchmark")
+def schedule(
+    sync_hours: Annotated[float, typer.Option(envvar="SYNC_INTERVAL_HOURS")] = 6,
+    benchmark_days: Annotated[float, typer.Option(envvar="BENCHMARK_INTERVAL_DAYS")] = 7,
+) -> None:
+    import time
+
+    log = logging.getLogger("goszakup.schedule")
+
+    async def has_data() -> bool:
+        engine = make_engine(get_settings())
+        try:
+            async with engine.connect() as conn:
+                runs = await conn.scalar(
+                    text("SELECT count(*) FROM meta.sync_run WHERE status = 'ok'")
+                )
+                return bool(runs)
+        finally:
+            await engine.dispose()
+
+    async def loop() -> None:
+        if not await has_data():
+            log.info("empty database: running bootstrap")
+            await _bootstrap(full=True, benchmark=True)
+        next_benchmark = time.monotonic() + benchmark_days * 86400
+        while True:
+            try:
+                await _sync()
+                if time.monotonic() >= next_benchmark:
+                    await _load_cpi()
+                    await _run(
+                        "ingest benchmark",
+                        lambda i: i.load_benchmark(coverage=0.95, max_contracts=200),
+                    )
+                    await _with_engine(refresh_marts)
+                    next_benchmark = time.monotonic() + benchmark_days * 86400
+            except Exception:
+                log.exception("scheduled run failed; retrying at the next interval")
+            await asyncio.sleep(sync_hours * 3600)
+
+    asyncio.run(loop())
 
 
 @app.command("status", help="Row counts and recent sync runs")
