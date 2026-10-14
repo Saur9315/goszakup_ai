@@ -356,6 +356,60 @@ def create_api_user() -> None:
     asyncio.run(_with_engine(job))
 
 
+eval_app = typer.Typer(no_args_is_help=True)
+app.add_typer(eval_app, name="eval", help="Agent quality evaluation")
+
+
+@eval_app.command("run", help="Run the golden question set and write a report")
+def eval_run(
+    provider: Annotated[str | None, typer.Option(help="openai, qwen or gemini")] = None,
+    model: Annotated[str | None, typer.Option(help="Model name for the provider")] = None,
+    concurrency: int = 4,
+    only: Annotated[list[str] | None, typer.Option(help="Case id prefixes to run")] = None,
+) -> None:
+    from goszakup_ai.agent.graph import open_agent
+    from goszakup_ai.core.config import REPO_ROOT
+    from goszakup_ai.evals.cases import build_cases
+    from goszakup_ai.evals.runner import render_report, run_eval
+
+    settings = get_settings()
+    updates: dict[str, str] = {}
+    if provider:
+        updates["llm_provider"] = provider
+    if model:
+        updates[f"{provider or settings.llm_provider}_model"] = model
+    settings = settings.model_copy(update=updates)
+
+    async def job(engine: AsyncEngine) -> None:
+        sessions = make_sessionmaker(engine)
+        async with sessions() as session:
+            cases = await build_cases(session)
+            as_of = await session.scalar(
+                text(
+                    "SELECT max(finished_at) FROM meta.sync_run "
+                    "WHERE status = 'ok' AND command LIKE 'ingest scope%'"
+                )
+            )
+        if only:
+            cases = [c for c in cases if c.id.startswith(tuple(only))]
+        url = settings.database_url.get_secret_value()
+        async with open_agent(settings, sessions, url) as agent:
+            report = await run_eval(agent, cases, as_of, concurrency)
+        out = REPO_ROOT / "evals" / "reports"
+        out.mkdir(parents=True, exist_ok=True)
+        name = f"{report.started_at:%Y%m%d_%H%M}_{report.model.replace(':', '_')}"
+        (out / f"{name}.md").write_text(render_report(report), encoding="utf-8")
+        (out / f"{name}.json").write_text(report.model_dump_json(indent=2), encoding="utf-8")
+        m = report.metrics
+        typer.echo(
+            f"{report.model}: facts {m['fact_accuracy']:.1%} "
+            f"(LLM text {m['narrative_fact_accuracy']:.1%}), intent {m['intent_accuracy']:.1%}, "
+            f"errors {m['errors']} → evals/reports/{name}.md"
+        )
+
+    asyncio.run(_with_engine(job))
+
+
 @app.command("serve", help="Run the HTTP API")
 def serve(host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
     import uvicorn

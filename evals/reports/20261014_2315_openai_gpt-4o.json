@@ -1,0 +1,1546 @@
+{
+  "model": "openai:gpt-4o",
+  "started_at": "2026-10-14T23:15:50.926881",
+  "data_as_of": "2026-10-14T16:19:57.151420Z",
+  "cases": [
+    {
+      "id": "search-1",
+      "language": "ru",
+      "question": "Сколько договоров заключил(а) Больница МЦ УДП в 2025 году и на какую сумму?",
+      "intent_expected": "search",
+      "intent_actual": "search",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "договоров",
+          "kind": "count",
+          "expected": "1915",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "сумма",
+          "kind": "money",
+          "expected": "11882207255.99",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "последняя дата",
+          "kind": "text",
+          "expected": "31.12.2025",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "БИН",
+          "kind": "text",
+          "expected": "990740002243",
+          "in_answer": true,
+          "in_narrative": false
+        }
+      ],
+      "numbers_total": 9,
+      "numbers_grounded": 9,
+      "latencies_ms": [
+        3045
+      ],
+      "input_tokens": 3998,
+      "output_tokens": 155,
+      "run_ids": [
+        "1b94bdf9-7db3-4311-8fd5-675e9e3cf049"
+      ],
+      "error": null
+    },
+    {
+      "id": "search-2",
+      "language": "ru",
+      "question": "Сколько договоров заключил(а) Национальный госпиталь в 2024 году и на какую сумму?",
+      "intent_expected": "search",
+      "intent_actual": "search",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "договоров",
+          "kind": "count",
+          "expected": "1028",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "сумма",
+          "kind": "money",
+          "expected": "20838398189.41",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "последняя дата",
+          "kind": "text",
+          "expected": "21.07.2025",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "БИН",
+          "kind": "text",
+          "expected": "231040023028",
+          "in_answer": true,
+          "in_narrative": false
+        }
+      ],
+      "numbers_total": 10,
+      "numbers_grounded": 10,
+      "latencies_ms": [
+        3503
+      ],
+      "input_tokens": 4012,
+      "output_tokens": 212,
+      "run_ids": [
+        "88f6aa1d-e10b-4e58-acea-e5dd2c2e4597"
+      ],
+      "error": null
+    },
+    {
+      "id": "search-3",
+      "language": "ru",
+      "question": "Сколько договоров заключил(а) ЛОК Ок-Жетпес в 2025 году и на какую сумму?",
+      "intent_expected": "search",
+      "intent_actual": "search",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "договоров",
+          "kind": "count",
+          "expected": "1118",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "сумма",
+          "kind": "money",
+          "expected": "1300531606.1",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "последняя дата",
+          "kind": "text",
+          "expected": "31.12.2025",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "БИН",
+          "kind": "text",
+          "expected": "051040005150",
+          "in_answer": true,
+          "in_narrative": false
+        }
+      ],
+      "numbers_total": 9,
+      "numbers_grounded": 9,
+      "latencies_ms": [
+        3547
+      ],
+      "input_tokens": 4002,
+      "output_tokens": 212,
+      "run_ids": [
+        "2ff0f4fc-d6b8-4ab5-8e04-5c6a2ef03161"
+      ],
+      "error": null
+    },
+    {
+      "id": "search-4",
+      "language": "ru",
+      "question": "Сколько договоров заключил(а) авиакомпания Беркут в 2025 году и на какую сумму?",
+      "intent_expected": "search",
+      "intent_actual": "search",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "договоров",
+          "kind": "count",
+          "expected": "178",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "сумма",
+          "kind": "money",
+          "expected": "342266270.04",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "последняя дата",
+          "kind": "text",
+          "expected": "31.12.2025",
+          "in_answer": true,
+          "in_narrative": false
+        },
+        {
+          "name": "БИН",
+          "kind": "text",
+          "expected": "000740001307",
+          "in_answer": true,
+          "in_narrative": false
+        }
+      ],
+      "numbers_total": 7,
+      "numbers_grounded": 7,
+      "latencies_ms": [
+        3399
+      ],
+      "input_tokens": 4010,
+      "output_tokens": 161,
+      "run_ids": [
+        "45280bb0-dff5-4941-a02f-26a4937d16b2"
+      ],
+      "error": null
+    },
+    {
+      "id": "search-5",
+      "language": "ru",
+      "question": "Сколько договоров заключил(а) Управление материально-технического обеспечения Генпрокуратуры в 2024 году и на какую сумму?",
+      "intent_expected": "search",
+      "intent_actual": "search",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "договоров",
+          "kind": "count",
+          "expected": "532",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "сумма",
+          "kind": "money",
+          "expected": "10648416361.49",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "последняя дата",
+          "kind": "text",
+          "expected": "30.12.2024",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "БИН",
+          "kind": "text",
+          "expected": "981140001551",
+          "in_answer": true,
+          "in_narrative": false
+        }
+      ],
+      "numbers_total": 10,
+      "numbers_grounded": 10,
+      "latencies_ms": [
+        2408
+      ],
+      "input_tokens": 4010,
+      "output_tokens": 181,
+      "run_ids": [
+        "495c1265-72c3-409b-9e74-b2aa71419d25"
+      ],
+      "error": null
+    },
+    {
+      "id": "search-kk-1",
+      "language": "kk",
+      "question": "2025 жылы Ұлттық госпиталь қанша шарт жасады және қандай сомаға?",
+      "intent_expected": "search",
+      "intent_actual": "search",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "договоров",
+          "kind": "count",
+          "expected": "959",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "сумма",
+          "kind": "money",
+          "expected": "2913991680.31",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "последняя дата",
+          "kind": "text",
+          "expected": "31.12.2025",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "БИН",
+          "kind": "text",
+          "expected": "231040023028",
+          "in_answer": true,
+          "in_narrative": false
+        }
+      ],
+      "numbers_total": 9,
+      "numbers_grounded": 9,
+      "latencies_ms": [
+        3363
+      ],
+      "input_tokens": 4003,
+      "output_tokens": 171,
+      "run_ids": [
+        "81926efb-379e-4a1a-a69b-1eee31a2a9ef"
+      ],
+      "error": null
+    },
+    {
+      "id": "search-bin-1",
+      "language": "ru",
+      "question": "Покажи договоры заказчика с БИН 970940001378 за 2024 год: сколько их и на какую сумму?",
+      "intent_expected": "search",
+      "intent_actual": "search",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "договоров",
+          "kind": "count",
+          "expected": "365",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "сумма",
+          "kind": "money",
+          "expected": "893120868.47",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "последняя дата",
+          "kind": "text",
+          "expected": "31.12.2024",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "БИН",
+          "kind": "text",
+          "expected": "970940001378",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 10,
+      "numbers_grounded": 10,
+      "latencies_ms": [
+        2856
+      ],
+      "input_tokens": 3997,
+      "output_tokens": 156,
+      "run_ids": [
+        "dbaa6aa4-9270-4589-a48e-14e2546f2899"
+      ],
+      "error": null
+    },
+    {
+      "id": "efficiency-1",
+      "language": "ru",
+      "question": "Какая доля закупок из одного источника у Автохозяйство УДП в 2025 году?",
+      "intent_expected": "analytics",
+      "intent_actual": "analytics",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "single_source_share",
+          "kind": "pct",
+          "expected": "0.14492517363076995",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 9,
+      "numbers_grounded": 9,
+      "latencies_ms": [
+        2742
+      ],
+      "input_tokens": 4127,
+      "output_tokens": 212,
+      "run_ids": [
+        "ec850003-77d0-4161-80ac-da212be091ef"
+      ],
+      "error": null
+    },
+    {
+      "id": "efficiency-2",
+      "language": "ru",
+      "question": "Какая доля несостоявшихся лотов у Национальный госпиталь в 2025 году?",
+      "intent_expected": "analytics",
+      "intent_actual": "analytics",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "lots_failed_share",
+          "kind": "pct",
+          "expected": "0.6139514731369151",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 9,
+      "numbers_grounded": 9,
+      "latencies_ms": [
+        2715
+      ],
+      "input_tokens": 4141,
+      "output_tokens": 201,
+      "run_ids": [
+        "f820161a-b90d-4b46-b0b4-2eac7285ddb3"
+      ],
+      "error": null
+    },
+    {
+      "id": "efficiency-3",
+      "language": "ru",
+      "question": "Какая экономия к плановой цене у детский сад Қарлығаш в 2024 году?",
+      "intent_expected": "analytics",
+      "intent_actual": "analytics",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "economy_share",
+          "kind": "pct",
+          "expected": "0.15567744330641112",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 10,
+      "numbers_grounded": 10,
+      "latencies_ms": [
+        2687
+      ],
+      "input_tokens": 4136,
+      "output_tokens": 190,
+      "run_ids": [
+        "ab930ba1-acb4-4509-be40-d3c6f5e4705f"
+      ],
+      "error": null
+    },
+    {
+      "id": "efficiency-4",
+      "language": "ru",
+      "question": "Какую долю закупок Дирекция государственных резиденций провела из одного источника в 2025 году?",
+      "intent_expected": "analytics",
+      "intent_actual": "analytics",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "single_source_share",
+          "kind": "pct",
+          "expected": "0.5771520568815982",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 11,
+      "numbers_grounded": 11,
+      "latencies_ms": [
+        3299
+      ],
+      "input_tokens": 4136,
+      "output_tokens": 217,
+      "run_ids": [
+        "4ec29f5c-c962-48f6-a3d5-d3fde9667ba4"
+      ],
+      "error": null
+    },
+    {
+      "id": "efficiency-kk-1",
+      "language": "kk",
+      "question": "2025 жылы «Автохозяйство УДП» бір көзден сатып алу үлесі қандай?",
+      "intent_expected": "analytics",
+      "intent_actual": "analytics",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "single_source_share",
+          "kind": "pct",
+          "expected": "0.14492517363076995",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 8,
+      "numbers_grounded": 8,
+      "latencies_ms": [
+        3299
+      ],
+      "input_tokens": 4124,
+      "output_tokens": 182,
+      "run_ids": [
+        "603c365c-1312-4166-9f43-c8f2c5d7ac19"
+      ],
+      "error": null
+    },
+    {
+      "id": "compare-1",
+      "language": "ru",
+      "question": "Сравни Больница МЦ УДП и Национальный госпиталь по сумме и количеству договоров за 2025 год",
+      "intent_expected": "compare",
+      "intent_actual": "compare",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "договоров",
+          "kind": "count",
+          "expected": "1915",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "сумма",
+          "kind": "money",
+          "expected": "11882207255.99",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "договоров",
+          "kind": "count",
+          "expected": "959",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "сумма",
+          "kind": "money",
+          "expected": "2913991680.31",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 11,
+      "numbers_grounded": 11,
+      "latencies_ms": [
+        2967
+      ],
+      "input_tokens": 4211,
+      "output_tokens": 222,
+      "run_ids": [
+        "1cd5f307-b7ca-4280-aa6e-d7129a7e60ae"
+      ],
+      "error": null
+    },
+    {
+      "id": "compare-2",
+      "language": "ru",
+      "question": "Сравни ЛОК Ок-Жетпес и Ок-Жетпес Алматы по сумме и количеству договоров за 2024 год",
+      "intent_expected": "compare",
+      "intent_actual": "compare",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "договоров",
+          "kind": "count",
+          "expected": "1116",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "сумма",
+          "kind": "money",
+          "expected": "1063139602.46",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "договоров",
+          "kind": "count",
+          "expected": "648",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "сумма",
+          "kind": "money",
+          "expected": "1478370966.24",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 11,
+      "numbers_grounded": 11,
+      "latencies_ms": [
+        3430
+      ],
+      "input_tokens": 4201,
+      "output_tokens": 313,
+      "run_ids": [
+        "daa36dba-3ce8-432f-ba31-0b0e74cd8275"
+      ],
+      "error": null
+    },
+    {
+      "id": "compare-3",
+      "language": "ru",
+      "question": "Сравни Дирекция административных зданий и Дирекция государственных резиденций по сумме и количеству договоров за 2025 год",
+      "intent_expected": "compare",
+      "intent_actual": "compare",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "договоров",
+          "kind": "count",
+          "expected": "681",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "сумма",
+          "kind": "money",
+          "expected": "4963644023.0",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "договоров",
+          "kind": "count",
+          "expected": "513",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "сумма",
+          "kind": "money",
+          "expected": "1200348180.31",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 11,
+      "numbers_grounded": 11,
+      "latencies_ms": [
+        3046
+      ],
+      "input_tokens": 4235,
+      "output_tokens": 230,
+      "run_ids": [
+        "e6196660-6ffc-46ff-8dd0-445537bea00f"
+      ],
+      "error": null
+    },
+    {
+      "id": "price-anomaly-1",
+      "language": "ru",
+      "question": "Найди закупки у Дирекция государственных резиденций с отклонением цены > 30% от средневзвешенной по данному ЕНСТРУ за 2025 год",
+      "intent_expected": "price_anomaly",
+      "intent_actual": "price_anomaly",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "проверено",
+          "kind": "count",
+          "expected": "756",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "превышают порог",
+          "kind": "count",
+          "expected": "265",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "подтверждено",
+          "kind": "count",
+          "expected": "55",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 16,
+      "numbers_grounded": 16,
+      "latencies_ms": [
+        2843
+      ],
+      "input_tokens": 4428,
+      "output_tokens": 255,
+      "run_ids": [
+        "610dbfd6-ce7c-4423-ad4b-9bb4f72795c0"
+      ],
+      "error": null
+    },
+    {
+      "id": "price-anomaly-2",
+      "language": "ru",
+      "question": "Найди закупки у Больница МЦ УДП с отклонением цены > 30% от средневзвешенной по данному ЕНСТРУ за 2024 год",
+      "intent_expected": "price_anomaly",
+      "intent_actual": "price_anomaly",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "проверено",
+          "kind": "count",
+          "expected": "4434",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "превышают порог",
+          "kind": "count",
+          "expected": "2015",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "подтверждено",
+          "kind": "count",
+          "expected": "522",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 15,
+      "numbers_grounded": 15,
+      "latencies_ms": [
+        3539
+      ],
+      "input_tokens": 4488,
+      "output_tokens": 285,
+      "run_ids": [
+        "59b7bdbd-ea8a-43f8-8983-9586990ea83f"
+      ],
+      "error": null
+    },
+    {
+      "id": "price-anomaly-3",
+      "language": "ru",
+      "question": "Найди закупки с отклонением цены > 30% от средневзвешенной по данному ЕНСТРУ за 2025 год",
+      "intent_expected": "price_anomaly",
+      "intent_actual": "price_anomaly",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "проверено",
+          "kind": "count",
+          "expected": "18787",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "превышают порог",
+          "kind": "count",
+          "expected": "6996",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "подтверждено",
+          "kind": "count",
+          "expected": "1373",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 18,
+      "numbers_grounded": 18,
+      "latencies_ms": [
+        4600
+      ],
+      "input_tokens": 4464,
+      "output_tokens": 306,
+      "run_ids": [
+        "b1d1ab9f-87a8-41b4-acf1-f8c231ab9e08"
+      ],
+      "error": null
+    },
+    {
+      "id": "price-anomaly-kk-1",
+      "language": "kk",
+      "question": "2025 жылы Мемлекеттік резиденциялар дирекциясы бағасы ЕНС ТРУ бойынша орташа өлшенген бағадан 30%-дан астам ауытқыған сатып алуларды тап",
+      "intent_expected": "price_anomaly",
+      "intent_actual": "price_anomaly",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "проверено",
+          "kind": "count",
+          "expected": "756",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "превышают порог",
+          "kind": "count",
+          "expected": "265",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "подтверждено",
+          "kind": "count",
+          "expected": "55",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 12,
+      "numbers_grounded": 12,
+      "latencies_ms": [
+        3037
+      ],
+      "input_tokens": 4432,
+      "output_tokens": 223,
+      "run_ids": [
+        "c078dcee-9cda-4248-9cf1-eafb8fd6f95e"
+      ],
+      "error": null
+    },
+    {
+      "id": "volume-anomaly-1",
+      "language": "ru",
+      "question": "Выяви нетипичное завышение количества ТРУ по сравнению с предыдущими годами у Дирекция государственных резиденций",
+      "intent_expected": "volume_anomaly",
+      "intent_actual": "volume_anomaly",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": null,
+      "facts": [
+        {
+          "name": "проверено пар",
+          "kind": "count",
+          "expected": "705",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "нетипичный рост",
+          "kind": "count",
+          "expected": "191",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "рост #1",
+          "kind": "number",
+          "expected": "2.62",
+          "in_answer": true,
+          "in_narrative": false
+        }
+      ],
+      "numbers_total": 12,
+      "numbers_grounded": 12,
+      "latencies_ms": [
+        3212
+      ],
+      "input_tokens": 4616,
+      "output_tokens": 211,
+      "run_ids": [
+        "01c45fc5-3e02-4875-ac1d-d8feb0500380"
+      ],
+      "error": null
+    },
+    {
+      "id": "volume-anomaly-2",
+      "language": "ru",
+      "question": "Выяви нетипичное завышение количества ТРУ по сравнению с предыдущими годами у Больница МЦ УДП",
+      "intent_expected": "volume_anomaly",
+      "intent_actual": "volume_anomaly",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": null,
+      "facts": [
+        {
+          "name": "проверено пар",
+          "kind": "count",
+          "expected": "2327",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "нетипичный рост",
+          "kind": "count",
+          "expected": "817",
+          "in_answer": true,
+          "in_narrative": false
+        },
+        {
+          "name": "рост #1",
+          "kind": "number",
+          "expected": "3.33",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 13,
+      "numbers_grounded": 13,
+      "latencies_ms": [
+        3953
+      ],
+      "input_tokens": 4541,
+      "output_tokens": 282,
+      "run_ids": [
+        "511981f3-4473-4384-8768-852cf037d34b"
+      ],
+      "error": null
+    },
+    {
+      "id": "volume-anomaly-3",
+      "language": "ru",
+      "question": "Выяви нетипичное завышение количества ТРУ по сравнению с предыдущими годами у нацпарк Бурабай",
+      "intent_expected": "volume_anomaly",
+      "intent_actual": "volume_anomaly",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": null,
+      "facts": [
+        {
+          "name": "проверено пар",
+          "kind": "count",
+          "expected": "372",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "нетипичный рост",
+          "kind": "count",
+          "expected": "70",
+          "in_answer": true,
+          "in_narrative": false
+        },
+        {
+          "name": "рост #1",
+          "kind": "number",
+          "expected": "8.84",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 16,
+      "numbers_grounded": 16,
+      "latencies_ms": [
+        3202
+      ],
+      "input_tokens": 4485,
+      "output_tokens": 252,
+      "run_ids": [
+        "f77538ce-fce4-4720-b308-e744deb63ebb"
+      ],
+      "error": null
+    },
+    {
+      "id": "fair-price-1",
+      "language": "ru",
+      "question": "Оцени адекватность цены лота №74190697-ОК2 относительно аналогичных контрактов других ведомств в идентичном городе поставки",
+      "intent_expected": "fair_price",
+      "intent_actual": "fair_price",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": true,
+      "years_ok": null,
+      "facts": [
+        {
+          "name": "номер лота",
+          "kind": "text",
+          "expected": "74190697-ОК2",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "цена лота",
+          "kind": "money",
+          "expected": "71549100.0",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "число аналогов",
+          "kind": "count",
+          "expected": "24",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "Fair Price",
+          "kind": "money",
+          "expected": "88830.29",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "отклонение",
+          "kind": "pct",
+          "expected": "804.4584",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 9,
+      "numbers_grounded": 9,
+      "latencies_ms": [
+        4808
+      ],
+      "input_tokens": 5373,
+      "output_tokens": 353,
+      "run_ids": [
+        "4ececb23-45db-41d1-adb3-ad01b419130d"
+      ],
+      "error": null
+    },
+    {
+      "id": "fair-price-2",
+      "language": "ru",
+      "question": "Оцени адекватность цены лота №72145184-ОК1 относительно аналогичных контрактов других ведомств в идентичном городе поставки",
+      "intent_expected": "fair_price",
+      "intent_actual": "fair_price",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": true,
+      "years_ok": null,
+      "facts": [
+        {
+          "name": "номер лота",
+          "kind": "text",
+          "expected": "72145184-ОК1",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "цена лота",
+          "kind": "money",
+          "expected": "213955296.0",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "число аналогов",
+          "kind": "count",
+          "expected": "5",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "Fair Price",
+          "kind": "money",
+          "expected": "1366932.66",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "отклонение",
+          "kind": "pct",
+          "expected": "155.5222",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 13,
+      "numbers_grounded": 13,
+      "latencies_ms": [
+        2762
+      ],
+      "input_tokens": 4291,
+      "output_tokens": 193,
+      "run_ids": [
+        "eddd84f0-3994-4ae7-bd60-cb3eed7df587"
+      ],
+      "error": null
+    },
+    {
+      "id": "fair-price-3",
+      "language": "ru",
+      "question": "Оцени адекватность цены лота №72266457-ОК2 относительно аналогичных контрактов других ведомств в идентичном городе поставки",
+      "intent_expected": "fair_price",
+      "intent_actual": "fair_price",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": true,
+      "years_ok": null,
+      "facts": [
+        {
+          "name": "номер лота",
+          "kind": "text",
+          "expected": "72266457-ОК2",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "цена лота",
+          "kind": "money",
+          "expected": "3150.0",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "число аналогов",
+          "kind": "count",
+          "expected": "153",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "Fair Price",
+          "kind": "money",
+          "expected": "3171.64",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "отклонение",
+          "kind": "pct",
+          "expected": "-0.0068",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 14,
+      "numbers_grounded": 14,
+      "latencies_ms": [
+        2765
+      ],
+      "input_tokens": 4232,
+      "output_tokens": 216,
+      "run_ids": [
+        "935c5e3f-67c4-4245-9df4-fb40cdb8ccf2"
+      ],
+      "error": null
+    },
+    {
+      "id": "fair-price-4",
+      "language": "ru",
+      "question": "Оцени адекватность цены лота №73534596-ОИ3 относительно аналогичных контрактов других ведомств в идентичном городе поставки",
+      "intent_expected": "fair_price",
+      "intent_actual": "fair_price",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": true,
+      "years_ok": null,
+      "facts": [
+        {
+          "name": "номер лота",
+          "kind": "text",
+          "expected": "73534596-ОИ3",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "цена лота",
+          "kind": "money",
+          "expected": "8490000.0",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "число аналогов",
+          "kind": "count",
+          "expected": "140",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "Fair Price",
+          "kind": "money",
+          "expected": "6513324.09",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "отклонение",
+          "kind": "pct",
+          "expected": "0.3035",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 13,
+      "numbers_grounded": 13,
+      "latencies_ms": [
+        2805
+      ],
+      "input_tokens": 4259,
+      "output_tokens": 205,
+      "run_ids": [
+        "ae7f708c-d335-41d1-ad55-192eaca9ac75"
+      ],
+      "error": null
+    },
+    {
+      "id": "fair-price-kk-1",
+      "language": "kk",
+      "question": "72067088-ОК1 лотының бағасы басқа ведомстволардың ұқсас келісімшарттарымен салыстырғанда қаншалықты әділ?",
+      "intent_expected": "fair_price",
+      "intent_actual": "fair_price",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": true,
+      "years_ok": null,
+      "facts": [
+        {
+          "name": "номер лота",
+          "kind": "text",
+          "expected": "72067088-ОК1",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "цена лота",
+          "kind": "money",
+          "expected": "44446000.0",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "число аналогов",
+          "kind": "count",
+          "expected": "24",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "Fair Price",
+          "kind": "money",
+          "expected": "254955.52",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "отклонение",
+          "kind": "pct",
+          "expected": "173.3284",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 11,
+      "numbers_grounded": 11,
+      "latencies_ms": [
+        4052
+      ],
+      "input_tokens": 4298,
+      "output_tokens": 213,
+      "run_ids": [
+        "7e6e83c8-674c-48ed-b97d-5701a6cc91a3"
+      ],
+      "error": null
+    },
+    {
+      "id": "dialog-followup-1",
+      "language": "ru",
+      "question": "Какая доля несостоявшихся лотов у Национальный госпиталь в 2025 году? → а в 2024?",
+      "intent_expected": "analytics",
+      "intent_actual": "analytics",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "lots_failed_share",
+          "kind": "pct",
+          "expected": "0.46719840478564306",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 9,
+      "numbers_grounded": 9,
+      "latencies_ms": [
+        2715,
+        2459
+      ],
+      "input_tokens": 8379,
+      "output_tokens": 322,
+      "run_ids": [
+        "3416aa65-193c-478d-82b0-db458e065205",
+        "f2abad5d-85ff-4c39-b121-6f63b511f36d"
+      ],
+      "error": null
+    },
+    {
+      "id": "dialog-followup-2",
+      "language": "ru",
+      "question": "Сколько договоров заключила Больница МЦ УДП в 2025 году? → а в 2024?",
+      "intent_expected": "search",
+      "intent_actual": "search",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": null,
+      "years_ok": true,
+      "facts": [
+        {
+          "name": "договоров",
+          "kind": "count",
+          "expected": "2210",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "сумма",
+          "kind": "money",
+          "expected": "14497115740.29",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 8,
+      "numbers_grounded": 8,
+      "latencies_ms": [
+        2391,
+        2533
+      ],
+      "input_tokens": 8062,
+      "output_tokens": 296,
+      "run_ids": [
+        "a7093f2a-ea28-47b8-a415-0bb808eca80f",
+        "8bb9a3d5-44ee-4865-a930-792f813f2203"
+      ],
+      "error": null
+    },
+    {
+      "id": "dialog-clarify-lot",
+      "language": "ru",
+      "question": "Оцени справедливость цены говядины у Дирекция административных зданий → 85092773-ОК3",
+      "intent_expected": "fair_price",
+      "intent_actual": "fair_price",
+      "kind_expected": "answer",
+      "kind_actual": "answer",
+      "bins_ok": true,
+      "lots_ok": true,
+      "years_ok": null,
+      "facts": [
+        {
+          "name": "номер лота",
+          "kind": "text",
+          "expected": "85092773-ОК3",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "цена лота",
+          "kind": "money",
+          "expected": "3200.0",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "число аналогов",
+          "kind": "count",
+          "expected": "24",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "Fair Price",
+          "kind": "money",
+          "expected": "3084.25",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "отклонение",
+          "kind": "pct",
+          "expected": "0.0375",
+          "in_answer": true,
+          "in_narrative": true
+        }
+      ],
+      "numbers_total": 14,
+      "numbers_grounded": 14,
+      "latencies_ms": [
+        1065,
+        3224
+      ],
+      "input_tokens": 7691,
+      "output_tokens": 297,
+      "run_ids": [
+        "dff81cdb-8d8f-429d-b5e9-f8f60415fa72",
+        "4064d251-f734-4ae7-acdb-fb3e8df6999a"
+      ],
+      "error": null
+    },
+    {
+      "id": "clarify-no-lot",
+      "language": "ru",
+      "question": "Оцени справедливость цены лота",
+      "intent_expected": "fair_price",
+      "intent_actual": "fair_price",
+      "kind_expected": "clarification",
+      "kind_actual": "clarification",
+      "bins_ok": null,
+      "lots_ok": null,
+      "years_ok": null,
+      "facts": [],
+      "numbers_total": 0,
+      "numbers_grounded": 0,
+      "latencies_ms": [
+        1031
+      ],
+      "input_tokens": 3202,
+      "output_tokens": 42,
+      "run_ids": [
+        "56668bbc-7ec1-44f8-b5fe-f27a13cdd85f"
+      ],
+      "error": null
+    },
+    {
+      "id": "out-of-scope-1",
+      "language": "ru",
+      "question": "Какая погода завтра в Астане?",
+      "intent_expected": "out_of_scope",
+      "intent_actual": "out_of_scope",
+      "kind_expected": "clarification",
+      "kind_actual": "clarification",
+      "bins_ok": null,
+      "lots_ok": null,
+      "years_ok": null,
+      "facts": [],
+      "numbers_total": 0,
+      "numbers_grounded": 0,
+      "latencies_ms": [
+        1182
+      ],
+      "input_tokens": 3203,
+      "output_tokens": 43,
+      "run_ids": [
+        "ceecbbaa-0f1b-46bd-bf47-d46aa5a3732d"
+      ],
+      "error": null
+    },
+    {
+      "id": "out-of-scope-kk",
+      "language": "kk",
+      "question": "Ертең Астанада ауа райы қандай болады?",
+      "intent_expected": "out_of_scope",
+      "intent_actual": "out_of_scope",
+      "kind_expected": "clarification",
+      "kind_actual": "clarification",
+      "bins_ok": null,
+      "lots_ok": null,
+      "years_ok": null,
+      "facts": [],
+      "numbers_total": 0,
+      "numbers_grounded": 0,
+      "latencies_ms": [
+        1062
+      ],
+      "input_tokens": 3205,
+      "output_tokens": 43,
+      "run_ids": [
+        "fe160061-5ceb-4e6a-b2b9-076d917e165e"
+      ],
+      "error": null
+    }
+  ],
+  "metrics": {
+    "cases": 33,
+    "questions": 36,
+    "errors": 0,
+    "facts": 99,
+    "fact_accuracy": 1.0,
+    "narrative_fact_accuracy": 0.898989898989899,
+    "intent_accuracy": 1.0,
+    "kind_accuracy": 1.0,
+    "bins_accuracy": 1.0,
+    "lots_accuracy": 1.0,
+    "years_accuracy": 1.0,
+    "grounding": 1.0,
+    "latency_p50_ms": 3002.0,
+    "latency_p95_ms": 4052,
+    "input_tokens": 148992,
+    "output_tokens": 7052
+  }
+}
