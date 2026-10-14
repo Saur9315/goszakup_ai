@@ -6,6 +6,8 @@ from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from goszakup_ai.transform.text import clean_name
+
 Row = dict[str, Any]
 
 KZ_TZ = ZoneInfo("Asia/Almaty")
@@ -92,6 +94,7 @@ def plan_point_rows(p: Row) -> PlanPointRows:
         "organizer_pid": as_int(p.get("sysOrganizatorId")),
         "name_ru": as_str(p.get("nameRu")),
         "name_kz": as_str(p.get("nameKz")),
+        "name_clean": clean_name(p.get("nameRu") or p.get("nameKz")),
         "desc_ru": as_str(p.get("descRu")),
         "desc_kz": as_str(p.get("descKz")),
         "extra_desc_ru": as_str(p.get("extraDescRu")),
@@ -245,6 +248,7 @@ def lot_rows(item: Row) -> LotRows:
         "customer_bin": as_str(item.get("customerBin")),
         "name_ru": as_str(item.get("nameRu")),
         "name_kz": as_str(item.get("nameKz")),
+        "name_clean": clean_name(item.get("nameRu") or item.get("nameKz")),
         "description_ru": as_str(item.get("descriptionRu")),
         "description_kz": as_str(item.get("descriptionKz")),
         "quantity": as_dec(item.get("count")),

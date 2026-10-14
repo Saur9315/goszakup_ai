@@ -17,20 +17,29 @@ PlansKato {
 RefEnstru { id code nameRu nameKz descRu parentId level edizm mkei }
 """
 
-CONTRACT_FIELDS = f"""
+CONTRACT_HEADER_FIELDS = """
 id rootId parentId refContractTypeId contractNumber contractNumberSys trdBuyId trdBuyNumberAnno
 customerId customerBin supplierId supplierBiin refContractStatusId faktTradeMethodsId
 refSubjectTypeId finYear refContractYearTypeId refFinsourceId signDate planExecDate
 faktExecDate contractEndDate contractSum contractSumWnds faktSum faktSumWnds withNds
 refCurrencyCode exchangeRate refContractCancelId deleted crdate lastUpdateDate indexDate
-ContractUnits {{
-  id rootId parentId lotId plnPointId trdBuyId refEnstruCode itemPrice itemPriceWnds quantity
-  totalSum totalSumWnds contractSum contractSumWnds factSum factSumWnds refContractStatusId
-  executed deleted execPlanDate execFaktDate crdate indexDate
-}}
-Supplier {{ {SUBJECT_FIELDS} }}
-Customer {{ {SUBJECT_FIELDS} }}
 """
+
+CONTRACT_UNIT_FIELDS = """
+id rootId parentId lotId plnPointId trdBuyId refEnstruCode itemPrice itemPriceWnds quantity
+totalSum totalSumWnds contractSum contractSumWnds factSum factSumWnds refContractStatusId
+executed deleted execPlanDate execFaktDate crdate indexDate
+"""
+
+
+def contract_fields(unit_extra: str = "") -> str:
+    return (
+        f"{CONTRACT_HEADER_FIELDS} ContractUnits {{ {CONTRACT_UNIT_FIELDS} {unit_extra} }} "
+        f"Supplier {{ {SUBJECT_FIELDS} }} Customer {{ {SUBJECT_FIELDS} }}"
+    )
+
+
+CONTRACT_FIELDS = contract_fields()
 
 LOT_FIELDS = """
 id lotNumber refLotStatusId lastUpdateDate unionLots count amount nameRu nameKz descriptionRu
@@ -66,3 +75,12 @@ PLAN_POINT = EntitySpec("plan_point", "Plans", "PlansFiltersInput", PLAN_POINT_F
 CONTRACT = EntitySpec("contract", "Contract", "ContractFiltersInput", CONTRACT_FIELDS)
 LOT = EntitySpec("lot", "Lots", "LotsFiltersInput", LOT_FIELDS)
 TRD_BUY = EntitySpec("trd_buy", "TrdBuy", "TrdBuyFiltersInput", TRD_BUY_FIELDS)
+
+
+BENCHMARK_CONTRACT_FIELDS = contract_fields(f"Plans {{ {PLAN_POINT_FIELDS} }}")
+
+BENCHMARK_CONTRACT_QUERY = (
+    "query($filter: ContractFiltersInput, $units: ContractUnitsFiltersInput, $after: Int) { "
+    "Contract(filter: $filter, contractUnitsFilter: $units, limit: 200, after: $after) { "
+    f"{BENCHMARK_CONTRACT_FIELDS} }} }}"
+)

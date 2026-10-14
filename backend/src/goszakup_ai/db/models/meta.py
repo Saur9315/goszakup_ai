@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Identity, String, Text, func
+from sqlalchemy import BigInteger, DateTime, Identity, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,7 +16,7 @@ class ScopeBin(Base):
 
     bin: Mapped[str] = mapped_column(String(12), primary_key=True)
     name_ru: Mapped[str | None] = mapped_column(Text)
-    added_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class SyncState(Base):
@@ -26,7 +26,9 @@ class SyncState(Base):
     entity: Mapped[str] = mapped_column(String(32), primary_key=True)
     scope_key: Mapped[str] = mapped_column(String(64), primary_key=True)
     last_index_date: Mapped[datetime | None]
-    last_success_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    last_success_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     rows_loaded: Mapped[int] = mapped_column(BigInteger, default=0)
 
 
@@ -36,8 +38,8 @@ class SyncRun(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     command: Mapped[str] = mapped_column(String(64))
-    started_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    finished_at: Mapped[datetime | None]
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(16), default="running")
     stats: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     error: Mapped[str | None] = mapped_column(Text)
@@ -55,4 +57,4 @@ class DqCheckResult(Base):
     failed_count: Mapped[int] = mapped_column(BigInteger)
     total_count: Mapped[int] = mapped_column(BigInteger)
     sample: Mapped[list[Any] | None] = mapped_column(JSONB)
-    checked_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

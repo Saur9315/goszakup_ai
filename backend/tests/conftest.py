@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+import goszakup_ai.db.models  # noqa: F401
 from goszakup_ai.core.config import Settings
-from goszakup_ai.db import models  # noqa: F401
 from goszakup_ai.db.base import SCHEMAS, Base
 
 

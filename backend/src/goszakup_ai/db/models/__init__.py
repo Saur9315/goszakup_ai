@@ -9,6 +9,7 @@ from goszakup_ai.db.models.core import (
     RefEnstru,
     RefKato,
     RefUnit,
+    RefUnitNorm,
     Subject,
     TrdBuy,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "RefEnstru",
     "RefKato",
     "RefUnit",
+    "RefUnitNorm",
     "ScopeBin",
     "Subject",
     "SyncRun",

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Iterable, Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import Table, delete
@@ -84,7 +84,7 @@ async def save_raw(
     key: str = "id",
     index_field: str | None = "indexDate",
 ) -> int:
-    now = datetime.now()
+    now = datetime.now(UTC)
     rows = [
         {
             "entity": entity,

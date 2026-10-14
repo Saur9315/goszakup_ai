@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from goszakup_ai.ingestion.mappers import (
     contract_rows,
@@ -8,6 +9,7 @@ from goszakup_ai.ingestion.mappers import (
     plan_point_rows,
     ref_dict_row,
 )
+from goszakup_ai.ingestion.pipeline import keep_units
 
 CONTRACT = {
     "id": 24083849,
@@ -108,6 +110,22 @@ def test_lot_rows_link_plan_points() -> None:
         {"lot_id": 9, "plan_point_id": 2},
     ]
     assert rows.lot["enstru_ids"] is None
+
+
+def test_keep_units_drops_other_enstru_codes() -> None:
+    contract: dict[str, Any] = {
+        "id": 1,
+        "ContractUnits": [
+            {"id": 10, "refEnstruCode": ["111111.100.000001"]},
+            {"id": 11, "refEnstruCode": ["222222.200.000002"]},
+            {"id": 12, "refEnstruCode": None},
+        ],
+    }
+
+    kept = keep_units(contract, "222222.200.000002")
+
+    assert [u["id"] for u in kept["ContractUnits"]] == [11]
+    assert len(contract["ContractUnits"]) == 3
 
 
 def test_ref_dict_row_keeps_unknown_fields_in_extra() -> None:

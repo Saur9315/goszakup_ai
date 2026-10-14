@@ -4,11 +4,11 @@ import asyncio
 import logging
 from collections import Counter
 from collections.abc import Awaitable, Callable, Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import partial
 from typing import Any
 
-from sqlalchemy import select, text, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
@@ -19,6 +19,7 @@ from goszakup_ai.db.models import (
     LotPlanPoint,
     PlanPoint,
     PlanPointKato,
+    RawObject,
     RefDict,
     RefEnstru,
     RefKato,
@@ -42,6 +43,7 @@ from goszakup_ai.ingestion.mappers import (
     trd_buy_row,
 )
 from goszakup_ai.ingestion.queries import (
+    BENCHMARK_CONTRACT_QUERY,
     CONTRACT,
     LOT,
     PLAN_POINT,
@@ -57,6 +59,25 @@ log = logging.getLogger(__name__)
 LOTS_UPDATED_SINCE = "2023-07-01"
 OPEN_END = "2100-01-01"
 ID_BATCH = 200
+REPLAY_BATCH = 2000
+BENCHMARK_ENTITY = "contract_bench"
+
+BENCHMARK_CODES_SQL = """
+    WITH spend AS (
+        SELECT enstru_code, sum(amount_kzt) AS amount
+        FROM mart.price_observation
+        WHERE in_scope AND unit_comparable AND enstru_code IS NOT NULL AND amount_kzt > 0
+        GROUP BY enstru_code
+    ),
+    ranked AS (
+        SELECT enstru_code, amount,
+               sum(amount) OVER (ORDER BY amount DESC, enstru_code) / sum(amount) OVER () AS cum
+        FROM spend
+    )
+    SELECT enstru_code FROM ranked
+    WHERE cum - amount / (SELECT sum(amount) FROM spend) < :coverage
+    ORDER BY cum
+"""
 
 REF_DICTS = {
     "ref_buy_status": "buy_status",
@@ -113,6 +134,21 @@ async def apply_contracts(session: AsyncSession, items: Sequence[Row]) -> None:
     await upsert(session, ContractUnit, [u for b in bundles for u in b.units])
 
 
+async def apply_benchmark_contracts(session: AsyncSession, items: Sequence[Row]) -> None:
+    plans = [u["Plans"] for c in items for u in c.get("ContractUnits") or [] if u.get("Plans")]
+    await apply_contracts(session, items)
+    await apply_plan_points(session, plans)
+
+
+def keep_units(contract: Row, enstru_code: str) -> Row:
+    units = [
+        u
+        for u in contract.get("ContractUnits") or []
+        if enstru_code in (u.get("refEnstruCode") or [])
+    ]
+    return {**contract, "ContractUnits": units}
+
+
 async def apply_lots(session: AsyncSession, items: Sequence[Row]) -> None:
     bundles = [lot_rows(i) for i in items]
     await upsert(session, Lot, [b.lot for b in bundles])
@@ -135,6 +171,7 @@ APPLY: dict[str, Callable[[AsyncSession, Sequence[Row]], Awaitable[None]]] = {
     CONTRACT.name: apply_contracts,
     LOT.name: apply_lots,
     TRD_BUY.name: apply_trd_buys,
+    BENCHMARK_ENTITY: apply_benchmark_contracts,
 }
 
 
@@ -171,6 +208,60 @@ class Ingestor:
         if failed:
             raise RuntimeError(f"{len(failed)} of {len(bins)} BINs failed")
 
+    async def load_benchmark(
+        self, *, coverage: float, max_contracts: int, full: bool = False
+    ) -> None:
+        async with self.sessions() as session:
+            codes = list(
+                (await session.execute(text(BENCHMARK_CODES_SQL), {"coverage": coverage})).scalars()
+            )
+        log.info(
+            "benchmark: %d ENSTRU codes cover %.0f%% of goods spend", len(codes), 100 * coverage
+        )
+        done = 0
+
+        async def one(code: str) -> None:
+            nonlocal done
+            async with self._semaphore:
+                await self._load_benchmark_code(code, max_contracts=max_contracts, full=full)
+            done += 1
+            if done % 50 == 0 or done == len(codes):
+                log.info("benchmark progress: %d/%d codes", done, len(codes))
+
+        results = await asyncio.gather(*(one(c) for c in codes), return_exceptions=True)
+        failed = [(c, r) for c, r in zip(codes, results, strict=True) if isinstance(r, Exception)]
+        for code, error in failed[:10]:
+            log.error("benchmark %s failed: %r", code, error)
+        if failed:
+            raise RuntimeError(f"{len(failed)} of {len(codes)} benchmark codes failed")
+
+    async def _load_benchmark_code(self, code: str, *, max_contracts: int, full: bool) -> None:
+        scope_key = f"bench:{code}"
+        since = None if full else await self._last_index_date(BENCHMARK_ENTITY, scope_key)
+        flt: dict[str, Any] = {"signDate": [f"{min(self.years)}-01-01", f"{max(self.years)}-12-31"]}
+        if since is not None:
+            flt["indexDate"] = [since.strftime("%Y-%m-%d %H:%M:%S"), OPEN_END]
+        variables = {"filter": flt, "units": {"refEnstruCode": [code]}}
+        total = 0
+        max_index: datetime | None = None
+        async for page in self.client.graphql_pages(
+            BENCHMARK_CONTRACT_QUERY, "Contract", variables
+        ):
+            items = [keep_units(c, code) for c in page]
+            async with self.sessions.begin() as session:
+                await save_raw(session, BENCHMARK_ENTITY, items)
+                await apply_benchmark_contracts(session, items)
+            total += len(items)
+            max_index = max(
+                [d for d in (parse_dt(i.get("indexDate")) for i in items) if d]
+                + ([max_index] if max_index else []),
+                default=None,
+            )
+            if total >= max_contracts:
+                break
+        self.stats[BENCHMARK_ENTITY] += total
+        await self._save_state(BENCHMARK_ENTITY, scope_key, max_index or since, total)
+
     async def fill_gaps(self) -> None:
         for spec in (LOT, PLAN_POINT, TRD_BUY):
             async with self.sessions() as session:
@@ -180,6 +271,29 @@ class Ingestor:
                 loaded += (await self._fetch(spec, {"id": ids[start : start + ID_BATCH]}))[0]
             self.stats[f"gap_{spec.name}"] += loaded
             log.info("gap fill %s: %d missing, %d loaded", spec.name, len(ids), loaded)
+
+    async def replay(self, entities: Sequence[str]) -> None:
+        for entity in entities:
+            apply = APPLY[entity]
+            last_key = ""
+            total = 0
+            while True:
+                async with self.sessions.begin() as session:
+                    rows = (
+                        await session.execute(
+                            select(RawObject.source_key, RawObject.payload)
+                            .where(RawObject.entity == entity, RawObject.source_key > last_key)
+                            .order_by(RawObject.source_key)
+                            .limit(REPLAY_BATCH)
+                        )
+                    ).all()
+                    if not rows:
+                        break
+                    await apply(session, [r.payload for r in rows])
+                last_key = rows[-1].source_key
+                total += len(rows)
+            self.stats[f"replay_{entity}"] += total
+            log.info("replay %s: %d rows", entity, total)
 
     async def start_run(self, command: str) -> int:
         async with self.sessions.begin() as session:
@@ -195,7 +309,7 @@ class Ingestor:
                 .where(SyncRun.id == run_id)
                 .values(
                     status=status,
-                    finished_at=datetime.now(),
+                    finished_at=func.now(),
                     stats=dict(self.stats),
                     error=error,
                 )
@@ -289,7 +403,7 @@ class Ingestor:
                         "entity": entity,
                         "scope_key": scope_key,
                         "last_index_date": last_index_date,
-                        "last_success_at": datetime.now(),
+                        "last_success_at": datetime.now(UTC),
                         "rows_loaded": rows,
                     }
                 ],

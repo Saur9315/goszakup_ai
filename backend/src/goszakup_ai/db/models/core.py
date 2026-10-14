@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import BigInteger, ForeignKey, Integer, Numeric, SmallInteger, String, Text
+from sqlalchemy import BigInteger, ForeignKey, Index, Integer, Numeric, SmallInteger, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -47,6 +47,17 @@ class RefUnit(Base):
     name_kz: Mapped[str | None] = mapped_column(Text)
 
 
+class RefUnitNorm(Base):
+    __tablename__ = "ref_unit_norm"
+    __table_args__ = SCHEMA
+
+    unit_code: Mapped[str] = mapped_column(String(16), primary_key=True)
+    canonical_code: Mapped[str] = mapped_column(String(16))
+    factor: Mapped[Decimal] = mapped_column(Numeric(20, 9))
+    dimension: Mapped[str] = mapped_column(String(16))
+    comparable: Mapped[bool]
+
+
 class RefKato(Base):
     __tablename__ = "ref_kato"
     __table_args__ = SCHEMA
@@ -89,16 +100,20 @@ class RefDict(Base):
 
 class PlanPoint(Base):
     __tablename__ = "plan_point"
-    __table_args__ = SCHEMA
+    __table_args__ = (
+        Index("ix_core_plan_point_customer_enstru", "customer_bin", "enstru_code"),
+        SCHEMA,
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
-    root_record_id: Mapped[int | None] = mapped_column(BigInteger)
+    root_record_id: Mapped[int | None] = mapped_column(BigInteger, index=True)
     year: Mapped[int | None] = mapped_column(SmallInteger, index=True)
     customer_pid: Mapped[int | None] = mapped_column(BigInteger)
     customer_bin: Mapped[str | None] = mapped_column(String(12), index=True)
     organizer_pid: Mapped[int | None] = mapped_column(BigInteger)
     name_ru: Mapped[str | None] = mapped_column(Text)
     name_kz: Mapped[str | None] = mapped_column(Text)
+    name_clean: Mapped[str | None] = mapped_column(Text)
     desc_ru: Mapped[str | None] = mapped_column(Text)
     desc_kz: Mapped[str | None] = mapped_column(Text)
     extra_desc_ru: Mapped[str | None] = mapped_column(Text)
@@ -181,6 +196,7 @@ class Lot(Base):
     customer_bin: Mapped[str | None] = mapped_column(String(12), index=True)
     name_ru: Mapped[str | None] = mapped_column(Text)
     name_kz: Mapped[str | None] = mapped_column(Text)
+    name_clean: Mapped[str | None] = mapped_column(Text)
     description_ru: Mapped[str | None] = mapped_column(Text)
     description_kz: Mapped[str | None] = mapped_column(Text)
     quantity: Mapped[Decimal | None] = mapped_column(AMOUNT)
