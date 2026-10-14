@@ -129,6 +129,16 @@ CHECKS: tuple[Check, ...] = (
         "(SELECT 1 FROM mart.cpi_index ci WHERE ci.month = mart.price_observation.sign_month)",
     ),
     Check(
+        "customer_coverage_drop",
+        "customer",
+        "warning",
+        "Число договоров организации за год упало более чем на 80% к прошлому году "
+        "(вероятно, закупки ведутся вне портала goszakup)",
+        "prev_contracts >= 20 AND contracts < 0.2 * prev_contracts",
+        source="mart.customer_coverage",
+        key="customer_bin",
+    ),
+    Check(
         "plan_point_without_enstru",
         "plan_point",
         "warning",

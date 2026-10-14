@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,6 +26,24 @@ class Settings(BaseSettings):
     ows_retry_base_delay_sec: float = 1.0
 
     ingest_concurrency: int = 4
+
+    llm_provider: Literal["openai", "qwen", "gemini"] = "openai"
+    llm_temperature: float = 0.0
+    llm_timeout_sec: float = 120.0
+    llm_max_concurrency: int | None = None
+    llm_requests_per_minute: int | None = None
+
+    openai_api_key: SecretStr | None = None
+    openai_model: str = "gpt-4o"
+    openai_base_url: str | None = None
+
+    qwen_api_key: SecretStr | None = None
+    qwen_model: str = "qwen3-8"
+    qwen_base_url: str = "https://llm.alem.ai/v1"
+
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 
 @lru_cache

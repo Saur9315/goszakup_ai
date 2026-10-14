@@ -241,9 +241,9 @@ def analyze_price_anomalies(
                 s,
                 threshold=threshold,
                 direction=dir_,
-                customer_bin=bin_,
-                year=year,
-                enstru_code=enstru,
+                customer_bins=[bin_] if bin_ else None,
+                years=[year] if year else None,
+                enstru_codes=[enstru] if enstru else None,
                 confirm_z=confirm_z,
                 only_confirmed=not all_,
                 limit=limit,
@@ -267,13 +267,42 @@ def analyze_volume_anomalies(
             lambda s: volume_anomalies(
                 s,
                 min_ratio=min_ratio,
-                customer_bin=bin_,
-                year=year,
+                customer_bins=[bin_] if bin_ else None,
+                years=[year] if year else None,
                 min_extra_amount=min_extra_amount,
                 limit=limit,
             )
         )
     )
+
+
+@app.command("ask", help="Ask the AI agent a question (RU/KZ)")
+def ask(
+    question: str,
+    as_json: Annotated[bool, typer.Option("--json", help="Print the full JSON answer")] = False,
+) -> None:
+    from goszakup_ai.agent.graph import Agent
+
+    async def job(engine: AsyncEngine) -> None:
+        agent = Agent(get_settings(), make_sessionmaker(engine))
+        answer = await agent.ask(question)
+        if as_json:
+            typer.echo(answer.model_dump_json(indent=2))
+        else:
+            typer.echo(answer.markdown)
+            typer.echo(
+                f"\nrun {answer.run_id} · {answer.model} · {answer.latency_ms} ms · "
+                f"intent={answer.params.intent}"
+            )
+
+    asyncio.run(_with_engine(job))
+
+
+@app.command("serve", help="Run the HTTP API")
+def serve(host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
+    import uvicorn
+
+    uvicorn.run("goszakup_ai.api.app:app", host=host, port=port, reload=reload)
 
 
 @app.command("status", help="Row counts and recent sync runs")

@@ -518,6 +518,43 @@ VOLUME_ANOMALY = Mart(
     ("(customer_bin, year)", "(ratio)", "(enstru_code)"),
 )
 
+ITEM_CATALOG = Mart(
+    "item_catalog",
+    """
+    SELECT enstru_code, name, sum(n_obs) AS n_obs, sum(n_scope) AS n_scope, sum(amount) AS amount
+    FROM (
+        SELECT enstru_code, item_name_clean AS name, count(*) AS n_obs,
+               count(*) FILTER (WHERE in_scope) AS n_scope, sum(amount_kzt) AS amount
+        FROM mart.price_observation
+        WHERE enstru_code IS NOT NULL AND item_name_clean IS NOT NULL
+        GROUP BY 1, 2
+        UNION ALL
+        SELECT code, lower(name_ru), 0, 0, 0 FROM core.ref_enstru WHERE name_ru IS NOT NULL
+    ) names
+    GROUP BY enstru_code, name
+    """,
+    ("USING gin (name gin_trgm_ops)", "(enstru_code)"),
+)
+
+CUSTOMER_COVERAGE = Mart(
+    "customer_coverage",
+    """
+    WITH yearly AS (
+        SELECT sb.bin AS customer_bin, sb.name_ru AS customer_name, y.year,
+               count(c.id) AS contracts, coalesce(sum(c.contract_sum), 0) AS amount
+        FROM meta.scope_bin sb
+        CROSS JOIN (SELECT DISTINCT fin_year AS year FROM mart.contract_current
+                    WHERE fin_year BETWEEN 2024 AND 2026) y
+        LEFT JOIN mart.contract_current c ON c.customer_bin = sb.bin AND c.fin_year = y.year
+        GROUP BY 1, 2, 3
+    )
+    SELECT *,
+           lag(contracts) OVER (PARTITION BY customer_bin ORDER BY year) AS prev_contracts
+    FROM yearly
+    """,
+    ("UNIQUE (customer_bin, year)",),
+)
+
 MARTS: tuple[Mart, ...] = (
     CONTRACT_CURRENT,
     ENSTRU_UNIT,
@@ -530,4 +567,6 @@ MARTS: tuple[Mart, ...] = (
     SEASON_INDEX,
     PRICE_ANOMALY,
     VOLUME_ANOMALY,
+    ITEM_CATALOG,
+    CUSTOMER_COVERAGE,
 )

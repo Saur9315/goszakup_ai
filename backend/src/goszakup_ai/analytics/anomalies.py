@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date
 from typing import Any, Literal
 
@@ -105,9 +106,9 @@ async def price_anomalies(
     *,
     threshold: float = 0.3,
     direction: Literal["above", "below", "both"] = "above",
-    customer_bin: str | None = None,
-    year: int | None = None,
-    enstru_code: str | None = None,
+    customer_bins: Sequence[str] | None = None,
+    years: Sequence[int] | None = None,
+    enstru_codes: Sequence[str] | None = None,
     min_peers: int = 5,
     confirm_z: float = 2.0,
     only_confirmed: bool = True,
@@ -119,21 +120,21 @@ async def price_anomalies(
         "both": "abs(deviation) > :threshold",
     }[direction]
     filters = ["peer_n >= :min_peers"]
-    if customer_bin:
-        filters.append("customer_bin = :customer_bin")
-    if year:
-        filters.append("fin_year = :year")
-    if enstru_code:
-        filters.append("enstru_code = :enstru_code")
+    if customer_bins:
+        filters.append("customer_bin = ANY(:customer_bins)")
+    if years:
+        filters.append("fin_year = ANY(:years)")
+    if enstru_codes:
+        filters.append("enstru_code = ANY(:enstru_codes)")
     where = " AND ".join(filters)
     confirmed = f"({deviation}) AND abs(robust_z) > :confirm_z"
     params: dict[str, Any] = {
         "confirm_z": confirm_z,
         "threshold": threshold,
         "min_peers": min_peers,
-        "customer_bin": customer_bin,
-        "year": year,
-        "enstru_code": enstru_code,
+        "customer_bins": list(customer_bins) if customer_bins else None,
+        "years": list(years) if years else None,
+        "enstru_codes": list(enstru_codes) if enstru_codes else None,
         "limit": limit,
     }
     summary = (
@@ -214,8 +215,9 @@ async def volume_anomalies(
     session: AsyncSession,
     *,
     min_ratio: float = 1.5,
-    customer_bin: str | None = None,
-    year: int | None = None,
+    customer_bins: Sequence[str] | None = None,
+    years: Sequence[int] | None = None,
+    enstru_codes: Sequence[str] | None = None,
     min_extra_amount: float = 0.0,
     limit: int = 20,
 ) -> VolumeAnomalyReport:
@@ -232,21 +234,22 @@ async def volume_anomalies(
     ).reshape(-1, 3)
     scores = isolation_scores(features)
 
+    def in_filter(r: Any) -> bool:
+        return (
+            (not customer_bins or r["customer_bin"] in customer_bins)
+            and (not years or r["year"] in years)
+            and (not enstru_codes or r["enstru_code"] in enstru_codes)
+        )
+
     def selected(r: Any) -> bool:
         return (
-            float(r["ratio"]) >= min_ratio
-            and (customer_bin is None or r["customer_bin"] == customer_bin)
-            and (year is None or r["year"] == year)
+            in_filter(r)
+            and float(r["ratio"]) >= min_ratio
             and float(r["extra_amount"] or 0) >= min_extra_amount
         )
 
     matched = [(r, s) for r, s in zip(rows, scores, strict=True) if selected(r)]
-    checked = sum(
-        1
-        for r in rows
-        if (customer_bin is None or r["customer_bin"] == customer_bin)
-        and (year is None or r["year"] == year)
-    )
+    checked = sum(1 for r in rows if in_filter(r))
     matched.sort(key=lambda rs: float(rs[0]["extra_amount"] or 0), reverse=True)
     items = [
         VolumeAnomaly(
@@ -273,8 +276,9 @@ async def volume_anomalies(
     return VolumeAnomalyReport(
         params={
             "min_ratio": min_ratio,
-            "customer_bin": customer_bin,
-            "year": year,
+            "customer_bins": list(customer_bins) if customer_bins else None,
+            "years": list(years) if years else None,
+            "enstru_codes": list(enstru_codes) if enstru_codes else None,
             "min_extra_amount": min_extra_amount,
         },
         checked=checked,
