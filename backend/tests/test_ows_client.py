@@ -14,7 +14,8 @@ TOKEN = "secret-test-token"
 @pytest.fixture
 def settings() -> Settings:
     return Settings(
-        _env_file=None,  # type: ignore[call-arg]
+        _env_file=None,
+        database_url="postgresql+asyncpg://test@localhost/test",
         ows_token=TOKEN,
         ows_base_url=BASE,
         ows_rate_limit_per_sec=1000,

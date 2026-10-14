@@ -1,0 +1,296 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+from collections import Counter
+from collections.abc import Awaitable, Callable, Sequence
+from datetime import datetime
+from functools import partial
+from typing import Any
+
+from sqlalchemy import select, text, update
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.orm import DeclarativeBase
+
+from goszakup_ai.db.models import (
+    Contract,
+    ContractUnit,
+    Lot,
+    LotPlanPoint,
+    PlanPoint,
+    PlanPointKato,
+    RefDict,
+    RefEnstru,
+    RefKato,
+    RefUnit,
+    ScopeBin,
+    Subject,
+    SyncRun,
+    SyncState,
+    TrdBuy,
+)
+from goszakup_ai.ingestion.mappers import (
+    Row,
+    contract_rows,
+    lot_rows,
+    parse_dt,
+    plan_point_rows,
+    ref_dict_row,
+    ref_kato_row,
+    ref_unit_row,
+    subject_row,
+    trd_buy_row,
+)
+from goszakup_ai.ingestion.queries import (
+    CONTRACT,
+    LOT,
+    PLAN_POINT,
+    SUBJECT,
+    TRD_BUY,
+    EntitySpec,
+)
+from goszakup_ai.ingestion.store import replace_children, save_raw, upsert
+from goszakup_ai.ows import OwsClient
+
+log = logging.getLogger(__name__)
+
+LOTS_UPDATED_SINCE = "2023-07-01"
+OPEN_END = "2100-01-01"
+ID_BATCH = 200
+
+REF_DICTS = {
+    "ref_buy_status": "buy_status",
+    "ref_lots_status": "lot_status",
+    "ref_contract_status": "contract_status",
+    "ref_pln_point_status": "plan_point_status",
+    "ref_subject_type": "subject_type",
+    "ref_trade_methods": "trade_method",
+}
+
+GAP_QUERIES = {
+    LOT.name: """
+        SELECT DISTINCT cu.lot_id FROM core.contract_unit cu
+        LEFT JOIN core.lot l ON l.id = cu.lot_id
+        WHERE cu.lot_id IS NOT NULL AND l.id IS NULL
+    """,
+    PLAN_POINT.name: """
+        SELECT DISTINCT cu.plan_point_id FROM core.contract_unit cu
+        LEFT JOIN core.plan_point p ON p.id = cu.plan_point_id
+        WHERE cu.plan_point_id IS NOT NULL AND p.id IS NULL
+    """,
+    TRD_BUY.name: """
+        SELECT DISTINCT x.id FROM (
+            SELECT trd_buy_id AS id FROM core.lot
+            UNION SELECT trd_buy_id FROM core.contract
+        ) x
+        LEFT JOIN core.trd_buy t ON t.id = x.id
+        WHERE x.id IS NOT NULL AND t.id IS NULL
+    """,
+}
+
+
+async def apply_subjects(session: AsyncSession, items: Sequence[Row]) -> None:
+    await upsert(session, Subject, [subject_row(i) for i in items])
+
+
+async def apply_plan_points(session: AsyncSession, items: Sequence[Row]) -> None:
+    bundles = [plan_point_rows(i) for i in items]
+    await upsert(session, PlanPoint, [b.plan_point for b in bundles])
+    await replace_children(
+        session,
+        PlanPointKato,
+        "plan_point_id",
+        [b.plan_point["id"] for b in bundles],
+        [k for b in bundles for k in b.katos],
+    )
+    await upsert(session, RefEnstru, [b.enstru for b in bundles if b.enstru])
+
+
+async def apply_contracts(session: AsyncSession, items: Sequence[Row]) -> None:
+    bundles = [contract_rows(i) for i in items]
+    await upsert(session, Subject, [s for b in bundles for s in b.subjects])
+    await upsert(session, Contract, [b.contract for b in bundles])
+    await upsert(session, ContractUnit, [u for b in bundles for u in b.units])
+
+
+async def apply_lots(session: AsyncSession, items: Sequence[Row]) -> None:
+    bundles = [lot_rows(i) for i in items]
+    await upsert(session, Lot, [b.lot for b in bundles])
+    await replace_children(
+        session,
+        LotPlanPoint,
+        "lot_id",
+        [b.lot["id"] for b in bundles],
+        [p for b in bundles for p in b.plan_points],
+    )
+
+
+async def apply_trd_buys(session: AsyncSession, items: Sequence[Row]) -> None:
+    await upsert(session, TrdBuy, [trd_buy_row(i) for i in items])
+
+
+APPLY: dict[str, Callable[[AsyncSession, Sequence[Row]], Awaitable[None]]] = {
+    SUBJECT.name: apply_subjects,
+    PLAN_POINT.name: apply_plan_points,
+    CONTRACT.name: apply_contracts,
+    LOT.name: apply_lots,
+    TRD_BUY.name: apply_trd_buys,
+}
+
+
+class Ingestor:
+    def __init__(
+        self,
+        client: OwsClient,
+        sessions: async_sessionmaker[AsyncSession],
+        *,
+        years: Sequence[int],
+        concurrency: int,
+    ) -> None:
+        self.client = client
+        self.sessions = sessions
+        self.years = tuple(years)
+        self.stats: Counter[str] = Counter()
+        self._semaphore = asyncio.Semaphore(concurrency)
+
+    async def load_refs(self) -> None:
+        await self._load_ref("ref_units", RefUnit, ref_unit_row, key="code")
+        await self._load_ref("ref_kato", RefKato, ref_kato_row, key="code")
+        for source, name in REF_DICTS.items():
+            await self._load_ref(source, RefDict, partial(ref_dict_row, name), key="id")
+
+    async def load_scope(self, bins: Sequence[str], *, full: bool = False) -> None:
+        await self._load_subjects(bins)
+        results = await asyncio.gather(
+            *(self._load_bin(b, full=full) for b in bins), return_exceptions=True
+        )
+        failed = [(b, r) for b, r in zip(bins, results, strict=True) if isinstance(r, Exception)]
+        for bin_, error in failed:
+            log.error("bin %s failed: %r", bin_, error)
+        await self.fill_gaps()
+        if failed:
+            raise RuntimeError(f"{len(failed)} of {len(bins)} BINs failed")
+
+    async def fill_gaps(self) -> None:
+        for spec in (LOT, PLAN_POINT, TRD_BUY):
+            async with self.sessions() as session:
+                ids = list((await session.execute(text(GAP_QUERIES[spec.name]))).scalars())
+            loaded = 0
+            for start in range(0, len(ids), ID_BATCH):
+                loaded += (await self._fetch(spec, {"id": ids[start : start + ID_BATCH]}))[0]
+            self.stats[f"gap_{spec.name}"] += loaded
+            log.info("gap fill %s: %d missing, %d loaded", spec.name, len(ids), loaded)
+
+    async def start_run(self, command: str) -> int:
+        async with self.sessions.begin() as session:
+            run = SyncRun(command=command)
+            session.add(run)
+            await session.flush()
+            return run.id
+
+    async def finish_run(self, run_id: int, status: str, error: str | None = None) -> None:
+        async with self.sessions.begin() as session:
+            await session.execute(
+                update(SyncRun)
+                .where(SyncRun.id == run_id)
+                .values(
+                    status=status,
+                    finished_at=datetime.now(),
+                    stats=dict(self.stats),
+                    error=error,
+                )
+            )
+
+    async def _load_ref(
+        self,
+        source: str,
+        model: type[DeclarativeBase],
+        mapper: Callable[[Row], Row],
+        *,
+        key: str,
+    ) -> None:
+        total = 0
+        async for page in self.client.rest_pages(f"/v3/refs/{source}"):
+            items = page.get("items") or []
+            async with self.sessions.begin() as session:
+                await save_raw(session, source, items, key=key, index_field=None)
+                await upsert(session, model, [mapper(i) for i in items])
+            total += len(items)
+        self.stats[source] += total
+        log.info("%s: %d rows", source, total)
+
+    async def _load_subjects(self, bins: Sequence[str]) -> None:
+        for bin_ in bins:
+            await self._fetch(SUBJECT, {"bin": bin_})
+        async with self.sessions.begin() as session:
+            rows = await session.execute(
+                select(Subject.bin, Subject.name_ru).where(Subject.bin.in_(bins))
+            )
+            names: dict[str | None, str | None] = {b: n for b, n in rows.tuples()}
+            await upsert(session, ScopeBin, [{"bin": b, "name_ru": names.get(b)} for b in bins])
+
+    async def _load_bin(self, bin_: str, *, full: bool) -> None:
+        async with self._semaphore:
+            await self._sync(
+                PLAN_POINT, bin_, {"subjectBiin": bin_, "plnPointYear": list(self.years)}, full
+            )
+            for year in self.years:
+                key = f"{bin_}:{year}"
+                await self._sync(CONTRACT, key, {"customerBin": bin_, "finYear": year}, full)
+                await self._sync(TRD_BUY, key, {"orgBin": bin_, "finYear": year}, full)
+            await self._sync(
+                LOT,
+                bin_,
+                {"customerBin": bin_, "lastUpdateDate": [LOTS_UPDATED_SINCE, OPEN_END]},
+                full,
+            )
+
+    async def _sync(
+        self, spec: EntitySpec, scope_key: str, base_filter: dict[str, Any], full: bool
+    ) -> None:
+        since = None if full else await self._last_index_date(spec.name, scope_key)
+        flt = dict(base_filter)
+        if since is not None:
+            flt["indexDate"] = [since.strftime("%Y-%m-%d %H:%M:%S"), OPEN_END]
+        total, max_index = await self._fetch(spec, flt)
+        await self._save_state(spec.name, scope_key, max_index or since, total)
+        mode = "incremental" if since else "full"
+        log.info("%s %s: %d rows (%s)", spec.name, scope_key, total, mode)
+
+    async def _fetch(self, spec: EntitySpec, flt: dict[str, Any]) -> tuple[int, datetime | None]:
+        total = 0
+        max_index: datetime | None = None
+        async for items in self.client.graphql_pages(spec.query, spec.root_field, {"filter": flt}):
+            async with self.sessions.begin() as session:
+                await save_raw(session, spec.name, items, key=spec.key)
+                await APPLY[spec.name](session, items)
+            total += len(items)
+            for item in items:
+                index_date = parse_dt(item.get("indexDate"))
+                if index_date and (max_index is None or index_date > max_index):
+                    max_index = index_date
+        self.stats[spec.name] += total
+        return total, max_index
+
+    async def _last_index_date(self, entity: str, scope_key: str) -> datetime | None:
+        async with self.sessions() as session:
+            state = await session.get(SyncState, (entity, scope_key))
+            return state.last_index_date if state else None
+
+    async def _save_state(
+        self, entity: str, scope_key: str, last_index_date: datetime | None, rows: int
+    ) -> None:
+        async with self.sessions.begin() as session:
+            await upsert(
+                session,
+                SyncState,
+                [
+                    {
+                        "entity": entity,
+                        "scope_key": scope_key,
+                        "last_index_date": last_index_date,
+                        "last_success_at": datetime.now(),
+                        "rows_loaded": rows,
+                    }
+                ],
+            )

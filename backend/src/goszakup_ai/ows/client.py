@@ -71,6 +71,8 @@ class OwsClient:
         *,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
+        if settings.ows_token is None:
+            raise OwsAuthError("OWS_TOKEN is not set")
         self._http = httpx.AsyncClient(
             base_url=settings.ows_base_url,
             headers={

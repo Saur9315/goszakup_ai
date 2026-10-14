@@ -14,13 +14,17 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    ows_token: SecretStr
+    database_url: SecretStr
+
+    ows_token: SecretStr | None = None
     ows_base_url: str = "https://ows.goszakup.gov.kz"
     ows_timeout_sec: float = 60.0
     ows_max_concurrency: int = 4
     ows_rate_limit_per_sec: float = 5.0
     ows_max_attempts: int = 6
     ows_retry_base_delay_sec: float = 1.0
+
+    ingest_concurrency: int = 4
 
 
 @lru_cache
