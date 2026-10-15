@@ -12,6 +12,8 @@ LLM не считает цифры: расчёты выполняют детер
 
 Полные отчёты — в [evals/reports](evals/reports).
 
+Документация для сдачи — в [docs](docs/README.md): [архитектура](docs/architecture.md), [схема хранения](docs/data-model.md), [аналитика и Fair Price](docs/analytics.md), [примеры ответов](docs/examples.md), [риски и ограничения](docs/risks.md).
+
 ## Архитектура
 
 ```

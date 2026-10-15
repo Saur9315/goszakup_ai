@@ -45,6 +45,10 @@ def allowed_numbers(p: ResolvedParams, results: list[ToolResult], facts: list[Fa
         *p.items,
         p.top_k,
         round(p.threshold * 100),
+        len(p.customer_bins),
+        len(p.years),
+        len(p.enstru_codes),
+        len(p.lot_numbers),
     ]
     for f in facts:
         values.extend([f.label, f.display, f.value])

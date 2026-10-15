@@ -1,0 +1,215 @@
+# Схема хранения
+
+Хранилище — PostgreSQL 17 с расширениями `pgvector` и `pg_trgm`. Схема версионируется миграциями Alembic (`backend/migrations`), витрины пересобираются командой `goszakup marts build`.
+
+## Слои
+
+| Схема | Назначение | Как наполняется |
+|---|---|---|
+| `raw` | ответы OWS v3 как есть (JSONB) с хешем и меткой индексации | загрузка; основа для пересборки `core` без повторной выгрузки (`goszakup ingest replay`) |
+| `core` | нормализованная модель: план, лоты, объявления, договоры, участники, справочники | маппинг из `raw` при загрузке |
+| `mart` | витрины для аналитики и агента (материализованные представления) | `goszakup marts build / refresh` |
+| `meta` | состояние синхронизации, проверки качества, журнал ответов агента, список 27 БИН | загрузка, проверки, агент |
+| `agent` | память диалогов (checkpointer LangGraph) | агент |
+
+Объёмы на 15.10.2026: `raw` — 490 тыс. объектов; `core` — 225 тыс. пунктов плана, 194 тыс. лотов, 42 тыс. объявлений, 195 тыс. договоров, 332 тыс. позиций договоров, 44 тыс. участников; `mart.price_observation` — 288 тыс. наблюдений цен (79 тыс. по 27 организациям и 209 тыс. по другим заказчикам РК).
+
+## Сущности OWS и таблицы
+
+ТЗ требует охватить объявления, план, договоры, лоты, вид предмета закупки, заказчиков, поставщиков, статусы и справочники.
+
+| Сущность ТЗ | Источник OWS v3 | Таблица | Зачем |
+|---|---|---|---|
+| План | GraphQL `Plans` | `core.plan_point`, `core.plan_point_kato` | код ЕНС ТРУ, единица измерения, плановая цена и количество, место поставки (КАТО); база для объёмов и экономии |
+| Объявления | GraphQL `TrdBuy` | `core.trd_buy` | способ закупки, статус, даты публикации и итогов, организатор |
+| Лоты | GraphQL `Lots` | `core.lot`, `core.lot_plan_point` | номер лота для вопросов «справедливость цены лота №…», статус (несостоявшиеся), связь с пунктами плана |
+| Договоры | GraphQL `Contract` + `ContractUnits` | `core.contract`, `core.contract_unit` | фактические цены за единицу без НДС и с НДС, количество, версии допсоглашений |
+| Заказчики и поставщики | GraphQL `Subjects`, вложенные `Supplier` и `Customer` | `core.subject` | названия, БИН/ИИН, признаки (малый бизнес, квазигоссектор), КАТО |
+| Вид предмета закупки | `ref_subject_type` (товар, работа, услуга) | `core.ref_dict` | цена за единицу сопоставима только для товаров |
+| Статусы | `ref_buy_status`, `ref_lots_status`, `ref_contract_status`, `ref_pln_point_status` | `core.ref_dict` | отбор актуальных версий, несостоявшиеся лоты, расторжения |
+| Способы закупки | `ref_trade_methods` | `core.ref_dict` | доля закупок из одного источника |
+| Единицы измерения | `ref_units` | `core.ref_unit`, `core.ref_unit_norm` | нормализация цен к общей единице |
+| Территории | `ref_kato` | `core.ref_kato` | регион и город поставки |
+| ЕНС ТРУ | вложенный `PlnPoint.RefEnstru` (в REST справочник недоступен) | `core.ref_enstru` | названия, иерархия, стандартная единица |
+| ИПЦ | Бюро национальной статистики, Taldau | `core.ref_cpi` | поправка цен на инфляцию |
+
+Не загружаются: заявки участников (`TrdApp`), акты, казначейские платежи, накладные, реестр недобросовестных поставщиков. Для вопросов ТЗ они не нужны, их можно добавить тем же механизмом.
+
+## Модель `core`
+
+```mermaid
+erDiagram
+    SUBJECT ||--o{ PLAN_POINT : "заказчик"
+    PLAN_POINT ||--o{ PLAN_POINT_KATO : "места поставки"
+    REF_ENSTRU ||--o{ PLAN_POINT : "код ЕНС ТРУ"
+    REF_UNIT ||--o{ PLAN_POINT : "единица"
+    REF_UNIT ||--o| REF_UNIT_NORM : "нормализация"
+    REF_KATO ||--o{ PLAN_POINT_KATO : "КАТО"
+    TRD_BUY ||--o{ LOT : "лоты объявления"
+    LOT ||--o{ LOT_PLAN_POINT : "состав"
+    PLAN_POINT ||--o{ LOT_PLAN_POINT : "входит в лот"
+    TRD_BUY ||--o{ CONTRACT : "по итогам"
+    SUBJECT ||--o{ CONTRACT : "заказчик / поставщик"
+    CONTRACT ||--o{ CONTRACT_UNIT : "позиции"
+    CONTRACT ||--o{ CONTRACT : "допсоглашения (root_id)"
+    PLAN_POINT ||--o{ CONTRACT_UNIT : "plan_point_id"
+    LOT ||--o{ CONTRACT_UNIT : "lot_id"
+
+    SUBJECT {
+        bigint pid PK
+        varchar bin
+        varchar iin
+        text name_ru
+        bool is_customer
+        bool is_supplier
+        text_array kato_list
+    }
+    PLAN_POINT {
+        bigint id PK
+        bigint root_record_id "предыдущая версия"
+        smallint year
+        varchar customer_bin
+        varchar enstru_code
+        varchar unit_code
+        numeric quantity
+        numeric price
+        numeric amount
+        int status_id
+        text name_clean
+    }
+    PLAN_POINT_KATO {
+        bigint id PK
+        bigint plan_point_id FK
+        varchar kato_code
+        numeric quantity
+    }
+    TRD_BUY {
+        bigint id PK
+        varchar number_anno
+        int trade_method_id
+        int status_id
+        varchar org_bin
+        timestamp publish_date
+        smallint_array fin_years
+    }
+    LOT {
+        bigint id PK
+        varchar lot_number
+        bigint trd_buy_id
+        varchar customer_bin
+        numeric quantity
+        numeric amount
+        int status_id
+        text name_clean
+    }
+    LOT_PLAN_POINT {
+        bigint lot_id PK
+        bigint plan_point_id PK
+    }
+    CONTRACT {
+        bigint id PK
+        bigint root_id "основной договор"
+        bigint parent_id "предыдущая версия"
+        smallint contract_type_id "1 основной, 2 допсоглашение"
+        varchar customer_bin
+        varchar supplier_biin
+        smallint fin_year
+        timestamp sign_date
+        int status_id
+        int fakt_trade_method_id
+        numeric contract_sum
+        bool with_nds
+        varchar currency_code
+    }
+    CONTRACT_UNIT {
+        bigint id PK
+        bigint contract_id FK
+        bigint root_id "первая версия позиции"
+        bigint plan_point_id
+        bigint lot_id
+        varchar enstru_code
+        numeric item_price "без НДС"
+        numeric item_price_wnds "с НДС"
+        numeric quantity
+        numeric total_sum
+    }
+    REF_ENSTRU {
+        bigint id PK
+        varchar code
+        bigint parent_id
+        text name_ru
+        text unit_name
+    }
+    REF_UNIT {
+        varchar code PK
+        text name_ru
+    }
+    REF_UNIT_NORM {
+        varchar unit_code PK
+        varchar canonical_code
+        numeric factor
+        varchar dimension
+        bool comparable
+    }
+    REF_KATO {
+        varchar code PK
+        varchar parent_code
+        smallint level
+        text name_ru
+    }
+```
+
+**Ключи и ограничения.** Первичные ключи — идентификаторы OWS. Внешние ключи заданы только внутри агрегатов, которые приходят одним ответом API (место поставки → пункт плана, позиция → договор, связь лот → пункт плана). Ссылки между сущностями из разных запросов (позиция → пункт плана, лот → объявление) внешними ключами не ограничены: при частичной выгрузке загрузка не должна падать. Их полноту контролируют проверки качества и догрузка связей.
+
+**Деньги** хранятся как `numeric(20,4)`, даты портала — как локальное время Казахстана без часового пояса, служебные метки (`fetched_at`, `started_at`) — с часовым поясом.
+
+## Версии записей
+
+**Договоры.** Допсоглашение — это новая запись договора (`contract_type_id = 2`) с полным набором позиций. `root_id` указывает на основной договор, `parent_id` — на предыдущую версию; старая версия получает статус «Изменен». Витрина `mart.contract_current` берёт последнюю неудалённую версию в цепочке. Без этого суммы считались бы дважды.
+
+**Позиции договоров.** Позиция каждой версии ссылается на свою первую версию через `root_id`.
+
+**Пункты плана.** При изменении плана появляется новая версия (`root_record_id` указывает на предыдущую), а старая исчезает из API. Поэтому около 10% позиций договоров ссылаются на пункты плана, которых в API уже нет. Витрина восстанавливает ссылку по цепочке:
+
+| Шаг | Как ищется пункт плана | Доля позиций 27 организаций |
+|---|---|---|
+| 1 | прямая ссылка `plan_point_id` | 88,6% |
+| 2 | новая версия пункта (`root_record_id`) | 1,4% |
+| 3 | пункт плана того же лота с тем же кодом ЕНС ТРУ | 0,4% |
+| 4 | пункт плана того же заказчика с тем же кодом ЕНС ТРУ (сначала того же года) | 7,8% |
+| 5 | только единица: самая частая для кода ЕНС ТРУ | 1,3% |
+| — | не восстановлено | 0,6% |
+
+Способ восстановления записан в `price_observation.plan_link` и учитывается в уверенности ответа. Эталонные цены строятся только по шагам 1–4.
+
+## Инкрементальное обновление
+
+`meta.sync_state` хранит по каждой паре «сущность × область» (БИН, БИН:год, код ЕНС ТРУ:год) максимальную метку `indexDate` из загруженных записей и время последнего успеха. Следующий запуск передаёт в GraphQL фильтр `indexDate ≥` этой метки с точностью до секунды. Повторная запись идемпотентна (`INSERT … ON CONFLICT DO UPDATE`), поэтому пересечение на границе безопасно.
+
+## Витрины `mart`
+
+| Витрина | Зерно | Назначение |
+|---|---|---|
+| `contract_current` | цепочка договоров | актуальная версия договора |
+| `price_observation` | позиция актуального договора | цена без НДС за нормализованную единицу, регион и город, ссылки на портал, способ восстановления пункта плана; основа всей ценовой аналитики |
+| `price_benchmark` | ЕНС ТРУ × единица × год × регион | средневзвешенная, медиана, квартили |
+| `price_anomaly` | позиция договора 27 организаций | отклонение от средневзвешенной по ЕНС ТРУ, robust z-score, оценка переплаты |
+| `volume_yearly` | заказчик × ЕНС ТРУ × год | плановые и фактические количества и суммы |
+| `volume_anomaly` | заказчик × ЕНС ТРУ × год | рост количества к прошлым годам и к другим заказчикам |
+| `procurement_efficiency` | заказчик × год | экономия, доля из одного источника, несостоявшиеся лоты, HHI, сроки |
+| `customer_coverage` | заказчик × год | число договоров и изменение к прошлому году (контроль полноты) |
+| `cpi_index` | месяц | накопленный индекс потребительских цен |
+| `region_price_index` | регион | региональный коэффициент цен |
+| `season_index` | месяц | сезонный коэффициент цен |
+| `enstru_unit` | код ЕНС ТРУ | самая частая единица измерения |
+| `item_catalog` | код ЕНС ТРУ × название | нечёткий поиск кода по названию товара (индекс `gin_trgm_ops`) |
+
+## Служебные таблицы `meta`
+
+| Таблица | Содержимое |
+|---|---|
+| `scope_bin` | 27 организаций выборки |
+| `sync_run` | журнал загрузок: команда, время, статус, статистика, ошибка |
+| `sync_state` | точки инкремента |
+| `dq_check_result` | результаты проверок качества с примерами id |
+| `analysis_run` | ответы агента: параметры, вызовы инструментов, ответ, проверка цифр, модель, токены, время по узлам, версия подсказок, `thread_id` |
