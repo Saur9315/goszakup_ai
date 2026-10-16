@@ -371,7 +371,8 @@ async def volume_anomaly(session: AsyncSession, p: ResolvedParams) -> ToolResult
     facts = [
         fact("Минимальный рост к базе", min_ratio, times(min_ratio)),
         fact("Проверено пар заказчик × ЕНС ТРУ × год", report.checked, num(report.checked)),
-        fact("Нетипичный рост количества", report.matched, num(report.matched)),
+        fact("Рост выше порога (критерий)", report.matched, num(report.matched)),
+        fact("Подтверждено Isolation Forest", report.confirmed, num(report.confirmed)),
     ]
     for i, v in enumerate(report.items[:5], 1):
         name = v.enstru_name or v.enstru_code
@@ -397,10 +398,19 @@ async def volume_anomaly(session: AsyncSession, p: ResolvedParams) -> ToolResult
             "ratio": times(v.ratio),
             "peers": f"{times(v.peer_ratio)} (n={v.peer_n})" if v.peer_ratio else "—",
             "extra": money(v.extra_amount),
-            "score": num(v.isolation_score, 3),
+            "model": f"{'да' if v.confirmed else 'нет'} ({num(v.isolation_score, 3)})",
         }
         for v in report.items
     ]
+    limitations = [
+        "Годы 2024–2026: база сравнения — 1–2 предыдущих года",
+        "Коды ЕНС ТРУ могут меняться между годами; такие позиции без базы не сравниваются",
+    ]
+    if any(v.ratio > 100 for v in report.items):
+        limitations.append(
+            "Рост более чем в 100 раз обычно означает разные единицы измерения в разные годы "
+            "или ошибку в плане"
+        )
     return ToolResult(
         tool="volume_anomalies",
         title="Нетипичный рост количества ТРУ",
@@ -416,13 +426,10 @@ async def volume_anomaly(session: AsyncSession, p: ResolvedParams) -> ToolResult
             ("ratio", "Рост"),
             ("peers", "Рост у других"),
             ("extra", "Сумма прироста"),
-            ("score", "Isolation Forest"),
+            ("model", "Нетипично по Isolation Forest"),
         ],
         method=report.method,
-        limitations=[
-            "Годы 2024–2026: база сравнения — 1–2 предыдущих года",
-            "Коды ЕНС ТРУ могут меняться между годами; такие позиции без базы не сравниваются",
-        ],
+        limitations=limitations,
         sample_size=report.checked,
     )
 

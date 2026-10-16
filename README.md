@@ -118,7 +118,7 @@ uv run goszakup chat              # диалог в терминале
 | `GET /api/runs/{id}` | сохранённый ответ: параметры, вызовы инструментов, проверка цифр |
 | `GET /api/fair-price/{lot}` | Fair Price лота без LLM |
 | `GET /api/anomalies/price`, `/api/anomalies/volume` | аномалии цен и объёмов |
-| `GET /api/efficiency`, `/api/orgs`, `/api/status` | эффективность, организации, свежесть данных и проверки качества |
+| `GET /api/efficiency`, `/api/orgs`, `/api/status` | эффективность, организации, свежесть данных, идущие загрузки и проверки качества |
 
 ## Структура
 

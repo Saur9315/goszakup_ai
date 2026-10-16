@@ -68,7 +68,7 @@ async def _ingestor() -> AsyncIterator[Ingestor]:
         async with OwsClient(settings) as client:
             yield Ingestor(
                 client,
-                make_sessionmaker(engine),
+                engine,
                 years=TARGET_YEARS,
                 concurrency=settings.ingest_concurrency,
             )
@@ -269,6 +269,7 @@ def analyze_volume_anomalies(
     bin_: Annotated[str | None, typer.Option("--bin")] = None,
     year: int | None = None,
     min_extra_amount: float = 0.0,
+    confirmed_only: bool = False,
     limit: int = 20,
 ) -> None:
     asyncio.run(
@@ -279,6 +280,7 @@ def analyze_volume_anomalies(
                 customer_bins=[bin_] if bin_ else None,
                 years=[year] if year else None,
                 min_extra_amount=min_extra_amount,
+                only_confirmed=confirmed_only,
                 limit=limit,
             )
         )

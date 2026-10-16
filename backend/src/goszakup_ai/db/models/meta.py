@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from goszakup_ai.db.base import Base
 
 SCHEMA = {"schema": "meta"}
+SYNC_LOCK_CLASS = 7301
 
 
 class ScopeBin(Base):
@@ -31,6 +32,15 @@ class SyncState(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     rows_loaded: Mapped[int] = mapped_column(BigInteger, default=0)
+
+
+class GapMiss(Base):
+    __tablename__ = "gap_miss"
+    __table_args__ = SCHEMA
+
+    entity: Mapped[str] = mapped_column(String(32), primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class SyncRun(Base):

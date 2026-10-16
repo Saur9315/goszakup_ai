@@ -7,6 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goszakup_ai.agent.schemas import AnswerKind, Intent, Language
+from goszakup_ai.analytics.anomalies import volume_anomalies
 from goszakup_ai.analytics.repository import fair_price_for_lot
 from goszakup_ai.evals.matching import FactKind
 
@@ -124,17 +125,15 @@ async def _volume_anomalies(session: AsyncSession, bin_: str) -> list[ExpectedFa
         f"AND coalesce(extra_amount, 0) >= 0) AS matched FROM mart.volume_anomaly WHERE {where}",
         b=bin_,
     )
-    top = await _one(
-        session,
-        f"SELECT ratio, quantity FROM mart.volume_anomaly WHERE {where} AND ratio >= 1.5 "
-        "AND coalesce(extra_amount, 0) >= 0 ORDER BY coalesce(extra_amount, 0) DESC LIMIT 1",
-        b=bin_,
-    )
-    return [
+    report = await volume_anomalies(session, customer_bins=[bin_], years=[2025, 2026], limit=1)
+    facts = [
         ExpectedFact("проверено пар", "count", r.checked),
-        ExpectedFact("нетипичный рост", "count", r.matched),
-        ExpectedFact("рост #1", "number", round(float(top.ratio), 2)),
+        ExpectedFact("рост выше порога", "count", r.matched),
+        ExpectedFact("подтверждено моделью", "count", report.confirmed),
     ]
+    if report.items:
+        facts.append(ExpectedFact("рост #1", "number", round(report.items[0].ratio, 2)))
+    return facts
 
 
 async def _fair_price(session: AsyncSession, lot: str) -> list[ExpectedFact]:

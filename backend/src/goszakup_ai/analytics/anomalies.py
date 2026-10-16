@@ -70,12 +70,14 @@ class VolumeAnomaly(BaseModel):
     amount: float | None
     extra_amount: float | None
     isolation_score: float
+    confirmed: bool
 
 
 class VolumeAnomalyReport(BaseModel):
     params: dict[str, Any]
     checked: int
     matched: int
+    confirmed: int
     items: list[VolumeAnomaly]
     method: str
 
@@ -91,13 +93,16 @@ PRICE_METHOD = (
     "Переплата = (цена − средневзвешенная) × количество."
 )
 
+ISOLATION_SHARE = 0.05
+
 VOLUME_METHOD = (
     "Количество по заказчику × коду ЕНС ТРУ × году берётся из годового плана (план 2026 года "
     "полный), при его отсутствии — из договоров. База — среднее количество за предыдущие годы. "
     "Рост = количество / база. Сравнение с коллегами: медиана роста по тому же коду у других "
-    "заказчиков выборки; превышение = рост / медиана коллег. Isolation Forest (scikit-learn, "
-    "random_state=42) по признакам log роста, log превышения, log суммы даёт оценку "
-    "нетипичности: чем выше, тем необычнее."
+    "заказчиков выборки; превышение = рост / медиана коллег. Формальный критерий: рост не ниже "
+    "порога. Подтверждённый рост: дополнительно Isolation Forest (scikit-learn, 200 деревьев, "
+    "random_state=42) по признакам log роста, log превышения над коллегами и log суммы, "
+    "обученный на всех парах заказчик × код × год, относит сочетание к 5% самых нетипичных."
 )
 
 
@@ -203,12 +208,15 @@ async def price_anomalies(
     )
 
 
-def isolation_scores(features: np.ndarray) -> np.ndarray:
+def isolation_outliers(
+    features: np.ndarray, share: float = ISOLATION_SHARE
+) -> tuple[np.ndarray, np.ndarray]:
     if len(features) < 10:
-        return np.zeros(len(features))
-    model = IsolationForest(n_estimators=200, random_state=42, contamination="auto")
+        return np.zeros(len(features)), np.zeros(len(features), dtype=bool)
+    model = IsolationForest(n_estimators=200, random_state=42, contamination=share)
     model.fit(features)
-    return np.asarray(-model.score_samples(features), dtype=float)
+    scores = np.asarray(-model.score_samples(features), dtype=float)
+    return scores, np.asarray(model.predict(features) == -1)
 
 
 async def volume_anomalies(
@@ -219,6 +227,7 @@ async def volume_anomalies(
     years: Sequence[int] | None = None,
     enstru_codes: Sequence[str] | None = None,
     min_extra_amount: float = 0.0,
+    only_confirmed: bool = False,
     limit: int = 20,
 ) -> VolumeAnomalyReport:
     rows = (await session.execute(text("SELECT * FROM mart.volume_anomaly"))).mappings().all()
@@ -232,7 +241,7 @@ async def volume_anomalies(
             for r in rows
         ]
     ).reshape(-1, 3)
-    scores = isolation_scores(features)
+    scores, outliers = isolation_outliers(features)
 
     def in_filter(r: Any) -> bool:
         return (
@@ -248,9 +257,15 @@ async def volume_anomalies(
             and float(r["extra_amount"] or 0) >= min_extra_amount
         )
 
-    matched = [(r, s) for r, s in zip(rows, scores, strict=True) if selected(r)]
+    matched = [
+        (r, float(s), bool(o))
+        for r, s, o in zip(rows, scores, outliers, strict=True)
+        if selected(r)
+    ]
     checked = sum(1 for r in rows if in_filter(r))
-    matched.sort(key=lambda rs: float(rs[0]["extra_amount"] or 0), reverse=True)
+    confirmed = sum(1 for _, _, o in matched if o)
+    shown = [m for m in matched if m[2]] if only_confirmed else matched
+    shown.sort(key=lambda m: (not m[2], -float(m[0]["extra_amount"] or 0)))
     items = [
         VolumeAnomaly(
             customer_bin=r["customer_bin"],
@@ -269,9 +284,10 @@ async def volume_anomalies(
             excess_ratio=round(float(r["excess_ratio"]), 3) if r["excess_ratio"] else None,
             amount=round(float(r["amount"]), 2) if r["amount"] is not None else None,
             extra_amount=round(float(r["extra_amount"]), 2) if r["extra_amount"] else None,
-            isolation_score=round(float(s), 3),
+            isolation_score=round(s, 3),
+            confirmed=o,
         )
-        for r, s in matched[:limit]
+        for r, s, o in shown[:limit]
     ]
     return VolumeAnomalyReport(
         params={
@@ -280,9 +296,11 @@ async def volume_anomalies(
             "years": list(years) if years else None,
             "enstru_codes": list(enstru_codes) if enstru_codes else None,
             "min_extra_amount": min_extra_amount,
+            "only_confirmed": only_confirmed,
         },
         checked=checked,
         matched=len(matched),
+        confirmed=confirmed,
         items=items,
         method=VOLUME_METHOD,
     )

@@ -8,8 +8,8 @@ from datetime import UTC, datetime
 from functools import partial
 from typing import Any
 
-from sqlalchemy import func, select, text, update
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy import func, insert, select, text, update
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
 from goszakup_ai.db.models import (
@@ -30,6 +30,8 @@ from goszakup_ai.db.models import (
     SyncState,
     TrdBuy,
 )
+from goszakup_ai.db.models.meta import SYNC_LOCK_CLASS
+from goszakup_ai.db.session import make_sessionmaker
 from goszakup_ai.ingestion.mappers import (
     Row,
     contract_rows,
@@ -59,6 +61,7 @@ log = logging.getLogger(__name__)
 LOTS_UPDATED_SINCE = "2023-07-01"
 OPEN_END = "2100-01-01"
 ID_BATCH = 200
+GAP_RETRY_DAYS = 7
 REPLAY_BATCH = 2000
 BENCHMARK_ENTITY = "contract_bench"
 
@@ -90,12 +93,12 @@ REF_DICTS = {
 
 GAP_QUERIES = {
     LOT.name: """
-        SELECT DISTINCT cu.lot_id FROM core.contract_unit cu
+        SELECT DISTINCT cu.lot_id AS id FROM core.contract_unit cu
         LEFT JOIN core.lot l ON l.id = cu.lot_id
         WHERE cu.lot_id IS NOT NULL AND l.id IS NULL
     """,
     PLAN_POINT.name: """
-        SELECT DISTINCT cu.plan_point_id FROM core.contract_unit cu
+        SELECT DISTINCT cu.plan_point_id AS id FROM core.contract_unit cu
         LEFT JOIN core.plan_point p ON p.id = cu.plan_point_id
         WHERE cu.plan_point_id IS NOT NULL AND p.id IS NULL
     """,
@@ -179,13 +182,15 @@ class Ingestor:
     def __init__(
         self,
         client: OwsClient,
-        sessions: async_sessionmaker[AsyncSession],
+        engine: AsyncEngine,
         *,
         years: Sequence[int],
         concurrency: int,
     ) -> None:
         self.client = client
-        self.sessions = sessions
+        self.engine = engine
+        self.sessions = make_sessionmaker(engine)
+        self._run_lock: AsyncConnection | None = None
         self.years = tuple(years)
         self.stats: Counter[str] = Counter()
         self._semaphore = asyncio.Semaphore(concurrency)
@@ -274,11 +279,34 @@ class Ingestor:
 
     async def fill_gaps(self) -> None:
         for spec in (LOT, PLAN_POINT, TRD_BUY):
+            gaps = GAP_QUERIES[spec.name]
             async with self.sessions() as session:
-                ids = list((await session.execute(text(GAP_QUERIES[spec.name]))).scalars())
+                ids = list(
+                    (
+                        await session.execute(
+                            text(
+                                f"SELECT g.id FROM ({gaps}) g WHERE NOT EXISTS ("
+                                "SELECT 1 FROM meta.gap_miss m WHERE m.entity = :entity "
+                                "AND m.id = g.id "
+                                "AND m.checked_at > now() - make_interval(days => :days))"
+                            ),
+                            {"entity": spec.name, "days": GAP_RETRY_DAYS},
+                        )
+                    ).scalars()
+                )
             loaded = 0
             for start in range(0, len(ids), ID_BATCH):
                 loaded += (await self._fetch(spec, {"id": ids[start : start + ID_BATCH]}))[0]
+            if ids:
+                async with self.sessions.begin() as session:
+                    await session.execute(
+                        text(
+                            "INSERT INTO meta.gap_miss (entity, id) "
+                            f"SELECT :entity, g.id FROM ({gaps}) g WHERE g.id = ANY(:ids) "
+                            "ON CONFLICT (entity, id) DO UPDATE SET checked_at = now()"
+                        ),
+                        {"entity": spec.name, "ids": ids},
+                    )
             self.stats[f"gap_{spec.name}"] += loaded
             log.info("gap fill %s: %d missing, %d loaded", spec.name, len(ids), loaded)
 
@@ -306,11 +334,58 @@ class Ingestor:
             log.info("replay %s: %d rows", entity, total)
 
     async def start_run(self, command: str) -> int:
-        async with self.sessions.begin() as session:
-            run = SyncRun(command=command)
-            session.add(run)
-            await session.flush()
-            return run.id
+        await self._close_stale_runs()
+        conn = await self.engine.connect()
+        run_id = (
+            await conn.execute(insert(SyncRun).values(command=command).returning(SyncRun.id))
+        ).scalar_one()
+        await conn.execute(
+            text("SELECT pg_advisory_lock(:c, CAST(:id AS int))"),
+            {"c": SYNC_LOCK_CLASS, "id": run_id},
+        )
+        await conn.commit()
+        self._run_lock = conn
+        return run_id
+
+    async def _close_stale_runs(self) -> None:
+        async with self.engine.connect() as conn:
+            running = (
+                await conn.execute(select(SyncRun.id).where(SyncRun.status == "running"))
+            ).scalars()
+            stale = [
+                run_id
+                for run_id in running
+                if await conn.scalar(
+                    text("SELECT pg_try_advisory_lock(:c, CAST(:id AS int))"),
+                    {"c": SYNC_LOCK_CLASS, "id": run_id},
+                )
+            ]
+            if stale:
+                await conn.execute(
+                    update(SyncRun)
+                    .where(SyncRun.id.in_(stale))
+                    .values(
+                        status="interrupted",
+                        finished_at=func.now(),
+                        error="process stopped before finishing",
+                    )
+                )
+            await conn.execute(text("SELECT pg_advisory_unlock_all()"))
+            await conn.commit()
+        for run_id in stale:
+            log.warning("sync run %d was interrupted earlier", run_id)
+
+    async def _release_run_lock(self) -> None:
+        conn, self._run_lock = self._run_lock, None
+        if conn is None:
+            return
+        try:
+            await conn.execute(text("SELECT pg_advisory_unlock_all()"))
+            await conn.commit()
+        except Exception:
+            await conn.invalidate()
+        finally:
+            await conn.close()
 
     async def finish_run(self, run_id: int, status: str, error: str | None = None) -> None:
         async with self.sessions.begin() as session:
@@ -324,6 +399,7 @@ class Ingestor:
                     error=error,
                 )
             )
+        await self._release_run_lock()
 
     async def _load_ref(
         self,

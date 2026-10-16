@@ -25,6 +25,7 @@ from goszakup_ai.analytics.fair_price import FairPriceResult
 from goszakup_ai.analytics.repository import NotFoundError, fair_price_for_lot
 from goszakup_ai.core.config import get_settings
 from goszakup_ai.db.models import AnalysisRun
+from goszakup_ai.db.models.meta import SYNC_LOCK_CLASS
 from goszakup_ai.db.session import make_engine, make_sessionmaker
 
 log = logging.getLogger(__name__)
@@ -131,7 +132,20 @@ async def status(db: Session) -> dict[str, Any]:
             "checked_at FROM meta.dq_check_result ORDER BY check_name, checked_at DESC"
         )
     )
-    return {"data_as_of": as_of, "checks": [dict(r._mapping) for r in checks]}
+    running = await db.execute(
+        text(
+            "SELECT r.id, r.command, r.started_at FROM meta.sync_run r "
+            "WHERE r.status = 'running' AND EXISTS (SELECT 1 FROM pg_locks l "
+            "WHERE l.locktype = 'advisory' AND l.classid::bigint = :c "
+            "AND l.objid::bigint = r.id AND l.objsubid = 2 AND l.granted) ORDER BY r.id"
+        ),
+        {"c": SYNC_LOCK_CLASS},
+    )
+    return {
+        "data_as_of": as_of,
+        "sync_running": [dict(r._mapping) for r in running],
+        "checks": [dict(r._mapping) for r in checks],
+    }
 
 
 @app.get("/api/orgs")
@@ -174,10 +188,16 @@ async def anomalies_volume(
     min_ratio: float = 1.5,
     bins: Annotated[list[str] | None, Query()] = None,
     years: Annotated[list[int] | None, Query()] = None,
+    confirmed_only: bool = False,
     limit: int = Query(default=20, le=200),
 ) -> VolumeAnomalyReport:
     return await volume_anomalies(
-        db, min_ratio=min_ratio, customer_bins=bins, years=years, limit=limit
+        db,
+        min_ratio=min_ratio,
+        customer_bins=bins,
+        years=years,
+        only_confirmed=confirmed_only,
+        limit=limit,
     )
 
 

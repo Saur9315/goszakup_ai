@@ -14,7 +14,14 @@ from goszakup_ai.db.models.core import (
     Subject,
     TrdBuy,
 )
-from goszakup_ai.db.models.meta import AnalysisRun, DqCheckResult, ScopeBin, SyncRun, SyncState
+from goszakup_ai.db.models.meta import (
+    AnalysisRun,
+    DqCheckResult,
+    GapMiss,
+    ScopeBin,
+    SyncRun,
+    SyncState,
+)
 from goszakup_ai.db.models.raw import RawObject
 
 __all__ = [
@@ -22,6 +29,7 @@ __all__ = [
     "Contract",
     "ContractUnit",
     "DqCheckResult",
+    "GapMiss",
     "Lot",
     "LotPlanPoint",
     "PlanPoint",
