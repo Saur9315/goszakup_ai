@@ -37,6 +37,7 @@ from goszakup_ai.agent.render import render
 from goszakup_ai.agent.resolve import resolve, scope_orgs
 from goszakup_ai.agent.schemas import (
     AgentAnswer,
+    AgentEvent,
     AnswerDraft,
     Fact,
     QuestionAnalysis,
@@ -55,6 +56,24 @@ log = logging.getLogger(__name__)
 
 MAX_COMPOSE_ATTEMPTS = 2
 PRICE_INTENTS = {"fair_price", "price_anomaly", "compare", "search"}
+STAGES = {
+    "understand": "Вопрос разобран",
+    "resolve": "Найдены организации, товары и лоты",
+    "check": "Проверена полнота вопроса",
+    "tools": "Расчёты по данным выполнены",
+    "compose": "Ответ сформулирован",
+    "verify": "Цифры сверены с расчётами",
+    "remember": "Диалог сохранён",
+}
+INTENT_LABELS = {
+    "search": "поиск",
+    "compare": "сравнение",
+    "analytics": "аналитика",
+    "price_anomaly": "аномалии цен",
+    "volume_anomaly": "аномалии объёмов",
+    "fair_price": "справедливость цены",
+    "out_of_scope": "вне темы закупок",
+}
 DQ_NOTES = {
     "unit_imputed": "единица измерения восстановлена косвенно у {share} позиций",
     "kato_from_customer": "место поставки определено по адресу заказчика у {share} позиций",
@@ -96,6 +115,19 @@ def timed(name: str, fn: Node) -> Callable[[AgentState, RunnableConfig], Awaitab
                 timings[name] = timings.get(name, 0) + elapsed
 
     return node
+
+
+def _stage_label(node: str, update: Any) -> str:
+    label = STAGES.get(node, node)
+    if not isinstance(update, dict):
+        return label
+    analysis = update.get("analysis")
+    if node == "understand" and analysis is not None:
+        return f"{label}: {INTENT_LABELS.get(analysis.intent, analysis.intent)}"
+    results = update.get("results")
+    if node == "tools" and results:
+        return f"{label}: " + "; ".join(r.title for r in results)
+    return label
 
 
 def template_draft(facts: list[Fact]) -> AnswerDraft:
@@ -299,6 +331,14 @@ class Agent:
         return list(snapshot.values.get("history", []))
 
     async def ask(self, question: str, thread_id: str | None = None) -> AgentAnswer:
+        async for event in self.stream(question, thread_id):
+            if event.answer is not None:
+                return event.answer
+        raise RuntimeError("agent finished without an answer")
+
+    async def stream(
+        self, question: str, thread_id: str | None = None
+    ) -> AsyncIterator[AgentEvent]:
         started = time.monotonic()
         run_id = uuid.uuid4()
         thread = thread_id or str(uuid.uuid4())
@@ -308,8 +348,16 @@ class Agent:
             "configurable": {"thread_id": thread, "timings": timings},
             "callbacks": [usage],
         }
+        state: AgentState = {}
         try:
-            state = cast(AgentState, await self.graph.ainvoke({"question": question}, config))
+            async for mode, chunk in self.graph.astream(
+                {"question": question}, config, stream_mode=["updates", "values"]
+            ):
+                if mode == "values":
+                    state = cast(AgentState, chunk)
+                    continue
+                for node, update in chunk.items():
+                    yield AgentEvent(kind="stage", stage=node, label=_stage_label(node, update))
             answer = await self._answer(run_id, thread, question, state, started)
         except Exception as e:
             await self._save_failed(run_id, thread, question, repr(e), started)
@@ -317,7 +365,7 @@ class Agent:
         answer.usage = {model: dict(u) for model, u in usage.usage_metadata.items()}
         answer.timings_ms = timings
         await self._save(answer)
-        return answer
+        yield AgentEvent(kind="answer", answer=answer)
 
     async def _answer(
         self, run_id: uuid.UUID, thread: str, question: str, state: AgentState, started: float

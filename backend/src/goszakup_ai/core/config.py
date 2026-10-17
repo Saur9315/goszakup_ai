@@ -31,6 +31,9 @@ class Settings(BaseSettings):
 
     embedding_dir: Path = REPO_ROOT / "data" / "models"
 
+    auth_secret: SecretStr | None = None
+    auth_token_hours: float = 12.0
+
     llm_provider: Literal["openai", "qwen", "gemini"] = "openai"
     llm_fallback_provider: Literal["openai", "qwen", "gemini"] | None = None
     llm_temperature: float = 0.0

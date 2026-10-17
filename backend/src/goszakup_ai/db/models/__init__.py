@@ -17,7 +17,9 @@ from goszakup_ai.db.models.core import (
     TrdBuy,
 )
 from goszakup_ai.db.models.meta import (
+    AgentThread,
     AnalysisRun,
+    AppUser,
     DqCheckResult,
     GapMiss,
     ScopeBin,
@@ -27,7 +29,9 @@ from goszakup_ai.db.models.meta import (
 from goszakup_ai.db.models.raw import RawObject
 
 __all__ = [
+    "AgentThread",
     "AnalysisRun",
+    "AppUser",
     "Contract",
     "ContractUnit",
     "DqCheckResult",

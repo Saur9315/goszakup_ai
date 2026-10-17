@@ -55,6 +55,18 @@ docker compose exec api goszakup ask "Найди закупки с отклон�
 
 Swagger: http://localhost:8000/docs. Чтобы продолжить диалог, передайте `thread_id` из предыдущего ответа.
 
+## Веб-интерфейс (необязательно)
+
+Streamlit-клиент к тому же API: чат с агентом (этапы работы видны по мере выполнения, диалоги сохраняются по пользователям), Fair Price лота, аномалии цен и объёмов с выгрузкой в CSV, эффективность закупок, свежесть данных и проверки качества. Интерфейс не имеет доступа к базе и ключам LLM; без него всё работает через API и CLI.
+
+```bash
+# в .env: AUTH_SECRET=$(openssl rand -hex 32) — включает вход и личные диалоги
+docker compose exec worker goszakup users add analyst     # пароль спросит интерактивно
+docker compose --profile ui up -d --build                 # или make ui
+```
+
+Интерфейс: http://localhost:8501. Без `AUTH_SECRET` вход отключён, а диалог живёт только во вкладке браузера.
+
 ## Своя LLM (on-prem)
 
 Любой сервер с OpenAI-совместимым API подключается без изменения кода:
@@ -81,6 +93,7 @@ docker build -t registry.local/goszakup-backend:0.1.0 backend && docker push reg
 kubectl create namespace goszakup
 kubectl -n goszakup create secret generic goszakup-secrets --from-env-file=.env
 kubectl apply -k deploy/k8s/base               # или deploy/k8s/overlays/local-llm (vLLM на GPU)
+kubectl apply -k deploy/k8s/overlays/ui         # вместе с веб-интерфейсом (образ ui/)
 ```
 
 Состав: Postgres (StatefulSet), Job миграций, API (Deployment, 2 реплики), CronJob синхронизации каждые 6 часов, выборки цен раз в неделю и ИПЦ раз в месяц, NetworkPolicy для доступа к базе. Секреты разделены: API работает под ролью только на чтение и не получает токен OWS.
@@ -108,6 +121,7 @@ uv run goszakup chat              # диалог в терминале
 | `goszakup analyze fair-price \| price-anomalies \| volume-anomalies` | аналитика без LLM |
 | `goszakup ask`, `goszakup chat` | вопрос агенту, диалог |
 | `goszakup eval run [--provider] [--model]` | прогон эталонного набора |
+| `goszakup users add \| list \| disable` | пользователи API и веб-интерфейса |
 | `goszakup serve` | HTTP API |
 
 ## API
@@ -115,7 +129,10 @@ uv run goszakup chat              # диалог в терминале
 | Метод | Назначение |
 |---|---|
 | `POST /api/ask` | вопрос агенту (`question`, необязательный `thread_id`) |
-| `GET /api/threads/{id}` | история диалога |
+| `POST /api/ask/stream` | то же, потоком SSE: события `stage` по этапам графа, затем `answer` |
+| `POST /api/auth/login`, `GET /api/me` | вход по логину и паролю, токен Bearer (при заданном `AUTH_SECRET`) |
+| `GET /api/threads` | мои диалоги (нужен вход) |
+| `GET /api/threads/{id}`, `/api/threads/{id}/answers` | история диалога и полные ответы; чужой диалог — 404 |
 | `GET /api/runs/{id}` | сохранённый ответ: параметры, вызовы инструментов, проверка цифр |
 | `GET /api/fair-price/{lot}` | Fair Price лота без LLM |
 | `GET /api/anomalies/price`, `/api/anomalies/volume` | аномалии цен и объёмов |
@@ -135,7 +152,8 @@ backend/src/goszakup_ai/
   analytics/   Fair Price, аномалии, ИПЦ, статистика
   agent/       граф LangGraph, инструменты, подсказки, проверка цифр, память
   evals/       эталонный набор и метрики
-  api/         FastAPI
+  api/         FastAPI, вход и токены
+ui/            Streamlit-клиент к API (необязательный)
 deploy/k8s/    манифесты Kubernetes (kustomize)
 evals/reports/ отчёты оценки качества
 ```

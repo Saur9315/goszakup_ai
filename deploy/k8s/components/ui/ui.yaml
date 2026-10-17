@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goszakup-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: goszakup-ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: goszakup-ui
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: ui
+          image: goszakup-ui
+          ports:
+            - containerPort: 8501
+          env:
+            - name: API_URL
+              value: http://goszakup-api
+          readinessProbe:
+            httpGet: {path: /_stcore/health, port: 8501}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /_stcore/health, port: 8501}
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 512Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: goszakup-ui
+spec:
+  selector:
+    app.kubernetes.io/name: goszakup-ui
+  ports:
+    - port: 80
+      targetPort: 8501

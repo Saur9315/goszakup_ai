@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from goszakup_ai.analytics.anomalies import price_anomalies, volume_anomalies
 from goszakup_ai.analytics.cpi import fetch_cpi_from_taldau, read_cpi_csv
 from goszakup_ai.analytics.repository import fair_price_for_lot
+from goszakup_ai.api.auth import hash_password
 from goszakup_ai.core.config import get_settings
 from goszakup_ai.core.scope import TARGET_BINS, TARGET_YEARS
 from goszakup_ai.db.models import RefCpi
@@ -365,6 +366,59 @@ def chat(thread: Annotated[str | None, typer.Option("--thread")] = None) -> None
 
 db_app = typer.Typer(no_args_is_help=True)
 app.add_typer(db_app, name="db", help="Database administration")
+users_app = typer.Typer(no_args_is_help=True)
+app.add_typer(users_app, name="users", help="Users of the API and UI")
+
+
+@users_app.command("add", help="Create a user or reset the password")
+def users_add(
+    username: str,
+    password: Annotated[str, typer.Option(prompt=True, hide_input=True, confirmation_prompt=True)],
+) -> None:
+    if len(password) < 8:
+        raise typer.BadParameter("password must be at least 8 characters")
+    name = username.strip().lower()
+
+    async def job(engine: AsyncEngine) -> None:
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "INSERT INTO meta.app_user (username, password_hash) VALUES (:u, :h) "
+                    "ON CONFLICT (username) DO UPDATE "
+                    "SET password_hash = excluded.password_hash, is_active = true"
+                ),
+                {"u": name, "h": hash_password(password)},
+            )
+        typer.echo(f"user {name} saved")
+
+    asyncio.run(_with_engine(job))
+
+
+@users_app.command("disable", help="Block a user; issued tokens stop working")
+def users_disable(username: str) -> None:
+    async def job(engine: AsyncEngine) -> None:
+        async with engine.begin() as conn:
+            result = await conn.execute(
+                text("UPDATE meta.app_user SET is_active = false WHERE username = :u"),
+                {"u": username.strip().lower()},
+            )
+        typer.echo("disabled" if result.rowcount else "no such user")
+
+    asyncio.run(_with_engine(job))
+
+
+@users_app.command("list", help="List users")
+def users_list() -> None:
+    async def job(engine: AsyncEngine) -> None:
+        async with engine.connect() as conn:
+            rows = await conn.execute(
+                text("SELECT username, is_active, created_at FROM meta.app_user ORDER BY username")
+            )
+            for r in rows:
+                state = "active" if r.is_active else "disabled"
+                typer.echo(f"{r.username:<24} {state:<9} {r.created_at:%Y-%m-%d}")
+
+    asyncio.run(_with_engine(job))
 
 
 @db_app.command("migrate", help="Apply migrations, rebuild changed marts, create the API user")

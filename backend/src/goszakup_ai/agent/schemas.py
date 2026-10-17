@@ -139,3 +139,10 @@ class AgentAnswer(BaseModel):
     usage: dict[str, Any] = Field(default_factory=dict)
     timings_ms: dict[str, int] = Field(default_factory=dict)
     prompt_version: str = ""
+
+
+class AgentEvent(BaseModel):
+    kind: Literal["stage", "answer"]
+    stage: str | None = None
+    label: str | None = None
+    answer: AgentAnswer | None = None
