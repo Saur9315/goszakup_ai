@@ -1,6 +1,8 @@
 from goszakup_ai.db.models.core import (
     Contract,
     ContractUnit,
+    ItemSubclass,
+    ItemText,
     Lot,
     LotPlanPoint,
     PlanPoint,
@@ -30,6 +32,8 @@ __all__ = [
     "ContractUnit",
     "DqCheckResult",
     "GapMiss",
+    "ItemSubclass",
+    "ItemText",
     "Lot",
     "LotPlanPoint",
     "PlanPoint",

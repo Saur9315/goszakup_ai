@@ -2,6 +2,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 MAD_TO_SIGMA = 1.4826
+HETEROGENEOUS_MAD_LOG = 0.7
 
 
 def weighted_quantile(values: ArrayLike, weights: ArrayLike, q: float) -> float:

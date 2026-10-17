@@ -30,3 +30,7 @@ def clean_name(value: str | None) -> str | None:
     text = _SEPARATORS.sub(" ", text).strip()
     text = _LEADING_VERB.sub("", text).strip()
     return text or None
+
+
+def desc_text_sql(column: str) -> str:
+    return rf"left(lower(regexp_replace(btrim({column}), '\s+', ' ', 'g')), 200)"

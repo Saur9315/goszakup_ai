@@ -51,6 +51,7 @@ async def db_engine() -> AsyncIterator[AsyncEngine]:
         pytest.skip("database is not reachable")
     engine = create_async_engine(url)
     async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         for schema in SCHEMAS:
             await conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
             await conn.execute(text(f"CREATE SCHEMA {schema}"))

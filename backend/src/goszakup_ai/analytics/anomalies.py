@@ -11,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goszakup_ai.analytics.links import announce_url, contract_url
+from goszakup_ai.analytics.stats import HETEROGENEOUS_MAD_LOG
 
 
 class PriceAnomaly(BaseModel):
@@ -33,6 +34,8 @@ class PriceAnomaly(BaseModel):
     robust_z: float | None
     confirmed: bool
     heterogeneous_group: bool
+    peer_group: Literal["subclass", "code"]
+    subclass_label: str | None
     peer_n: int
     n_customers: int
     overpayment_kzt: float
@@ -45,6 +48,7 @@ class PriceAnomaly(BaseModel):
 class PriceAnomalyReport(BaseModel):
     params: dict[str, Any]
     checked: int
+    checked_by_subclass: int
     matched: int
     confirmed: int
     confirmed_overpayment_kzt: float
@@ -86,8 +90,13 @@ PRICE_METHOD = (
     "Для каждой позиции договора заказчиков из выборки цена без НДС за нормализованную единицу "
     "приведена к ценам базового месяца по ИПЦ и сравнена со средневзвешенной по количеству ценой "
     "всех остальных закупок того же кода ЕНС ТРУ и единицы (все заказчики РК, 2024–2026, без "
-    "самой позиции). Отклонение = цена / средневзвешенная − 1. Формальный критерий ТЗ: отклонение "
-    "больше порога. Подтверждённая аномалия: дополнительно robust z-score по логарифму цены "
+    "самой позиции). Если в подклассе позиции (близкие по смыслу описания внутри кода, "
+    "эмбеддинги multilingual-e5-small) не меньше 5 других позиций и его медиана отличается от "
+    "медианы кода больше чем в 2 раза либо цены по коду неоднородны (MAD логарифма > 0.7), а "
+    "подкласс однороднее, сравнение идёт внутри подкласса. "
+    "Отклонение = цена / средневзвешенная − 1. "
+    "Формальный критерий ТЗ: отклонение больше порога. Подтверждённая аномалия: дополнительно "
+    "robust z-score по логарифму цены "
     "(медиана и MAD группы) выше порога z. Группа неоднородна, если MAD логарифма цены > 0.7: "
     "под одним кодом ЕНС ТРУ разные по классу товары. "
     "Переплата = (цена − средневзвешенная) × количество."
@@ -146,6 +155,7 @@ async def price_anomalies(
         await session.execute(
             text(
                 f"SELECT count(*) AS checked, "
+                f"count(*) FILTER (WHERE peer_group = 'subclass') AS checked_by_subclass, "
                 f"count(*) FILTER (WHERE {deviation}) AS matched, "
                 f"count(*) FILTER (WHERE {confirmed}) AS confirmed, "
                 f"coalesce(sum(overpayment_kzt) "
@@ -185,7 +195,9 @@ async def price_anomalies(
             deviation=round(float(r.deviation), 4),
             robust_z=round(float(r.robust_z), 2) if r.robust_z is not None else None,
             confirmed=bool(r.is_confirmed),
-            heterogeneous_group=(r.group_mad_log or 0) > 0.7,
+            heterogeneous_group=(r.group_mad_log or 0) > HETEROGENEOUS_MAD_LOG,
+            peer_group=r.peer_group,
+            subclass_label=r.subclass_label if r.peer_group == "subclass" else None,
             peer_n=r.peer_n,
             n_customers=r.n_customers,
             overpayment_kzt=round(float(r.overpayment_kzt), 2),
@@ -200,6 +212,7 @@ async def price_anomalies(
         params={k: v for k, v in params.items() if v is not None and k != "limit"}
         | {"direction": direction, "only_confirmed": only_confirmed},
         checked=summary.checked,
+        checked_by_subclass=summary.checked_by_subclass,
         matched=summary.matched,
         confirmed=summary.confirmed,
         confirmed_overpayment_kzt=round(float(summary.overpayment), 2),

@@ -20,9 +20,11 @@ from goszakup_ai.db.models import RefCpi
 from goszakup_ai.db.session import make_engine, make_sessionmaker
 from goszakup_ai.ingestion.pipeline import Ingestor
 from goszakup_ai.ingestion.store import upsert
-from goszakup_ai.marts.build import build_marts, refresh_marts
+from goszakup_ai.marts.build import build_marts, marts_outdated, refresh_marts
 from goszakup_ai.ows import OwsClient
 from goszakup_ai.quality.run import CheckResult, run_checks
+from goszakup_ai.semantic.embedder import ensure_model
+from goszakup_ai.semantic.subclass import update_subclasses
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 ingest_app = typer.Typer(no_args_is_help=True)
@@ -47,6 +49,8 @@ STATUS_TABLES = (
     "core.ref_unit",
     "core.ref_kato",
     "core.ref_dict",
+    "core.item_text",
+    "core.item_subclass",
     "raw.ows_object",
 )
 
@@ -100,10 +104,20 @@ def _print_checks(results: list[CheckResult]) -> None:
         )
 
 
+async def _subclasses(engine: AsyncEngine) -> None:
+    try:
+        await update_subclasses(engine, get_settings().embedding_dir)
+    except Exception:
+        logging.getLogger("goszakup.semantic").exception(
+            "item subclasses were not updated; marts use the previous ones"
+        )
+
+
 async def _sync() -> None:
     run_id = await _run("ingest scope (sync)", lambda i: i.load_scope(list(TARGET_BINS)))
     engine = make_engine(get_settings())
     try:
+        await _subclasses(engine)
         await refresh_marts(engine)
         _print_checks(await run_checks(engine, run_id))
     finally:
@@ -166,6 +180,23 @@ def ingest_replay(
 ) -> None:
     selected = entities or ["subject", "plan_point", "lot", "trd_buy", "contract"]
     asyncio.run(_run(f"ingest replay {' '.join(selected)}", lambda i: i.replay(selected)))
+
+
+@app.command("embed", help="Embed new item descriptions and update item subclasses")
+def embed(
+    download_only: Annotated[
+        bool, typer.Option("--download-only", help="Only fetch the embedding model")
+    ] = False,
+) -> None:
+    settings = get_settings()
+    if download_only:
+        typer.echo(ensure_model(settings.embedding_dir))
+        return
+
+    async def job(engine: AsyncEngine) -> None:
+        typer.echo(await update_subclasses(engine, settings.embedding_dir))
+
+    asyncio.run(_with_engine(job))
 
 
 @marts_app.command("build", help="Drop and recreate all marts")
@@ -336,7 +367,7 @@ db_app = typer.Typer(no_args_is_help=True)
 app.add_typer(db_app, name="db", help="Database administration")
 
 
-@db_app.command("migrate", help="Apply migrations and create the API login user")
+@db_app.command("migrate", help="Apply migrations, rebuild changed marts, create the API user")
 def db_migrate() -> None:
     from pathlib import Path
 
@@ -347,6 +378,12 @@ def db_migrate() -> None:
     if not ini.exists():
         raise typer.BadParameter(f"{ini} not found: run from the backend directory")
     command.upgrade(Config(str(ini)), "head")
+
+    async def rebuild_changed(engine: AsyncEngine) -> None:
+        if await marts_outdated(engine):
+            await build_marts(engine)
+
+    asyncio.run(_with_engine(rebuild_changed))
     if get_settings().api_database_url is not None:
         create_api_user()
 
@@ -451,12 +488,14 @@ async def _bootstrap(full: bool, benchmark: bool) -> None:
         "ingest scope --full" if full else "ingest scope",
         lambda i: i.load_scope(list(TARGET_BINS), full=full),
     )
+    await _with_engine(_subclasses)
     await _with_engine(build_marts)
     if benchmark:
         await _run(
             "ingest benchmark",
             lambda i: i.load_benchmark(coverage=0.95, max_contracts=200, full=full),
         )
+        await _with_engine(_subclasses)
         await _with_engine(refresh_marts)
 
     async def checks(engine: AsyncEngine) -> None:
@@ -506,6 +545,7 @@ def schedule(
                         "ingest benchmark",
                         lambda i: i.load_benchmark(coverage=0.95, max_contracts=200),
                     )
+                    await _with_engine(_subclasses)
                     await _with_engine(refresh_marts)
                     next_benchmark = time.monotonic() + benchmark_days * 86400
             except Exception:

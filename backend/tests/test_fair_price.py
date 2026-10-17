@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -116,3 +117,40 @@ def test_insufficient_data_has_low_confidence() -> None:
     assert result.verdict == "insufficient_data"
     assert result.confidence_label == "low"
     assert result.n == 2
+
+
+def test_prefers_analogs_with_similar_descriptions() -> None:
+    toys = [replace(obs(i, 1_500 + 300 * i), subclass=1, similarity=0.6) for i in range(6)]
+    surgical = [
+        replace(
+            obs(10 + i, 240_000_000 + 5_000_000 * i, region=ALMATY), subclass=0, similarity=0.95
+        )
+        for i in range(5)
+    ]
+
+    result = assess(target(260_000_000, subclass=0), toys + surgical, PriceAdjusters())
+
+    assert result.peer_group == "subclass"
+    assert result.level == "national"
+    assert result.verdict == "fair"
+    assert result.comparables[0].similarity == 0.95
+
+
+def test_keeps_whole_code_when_prices_are_homogeneous() -> None:
+    pool = [replace(obs(i, 100), subclass=0) for i in range(6)]
+    pool += [replace(obs(10 + i, 110), subclass=1) for i in range(5)]
+
+    result = assess(target(100, subclass=0), pool, PriceAdjusters())
+
+    assert result.peer_group == "code"
+    assert result.level == "locality"
+    assert result.n == 11
+
+
+def test_flags_heterogeneous_code_without_similar_analogs() -> None:
+    pool = [replace(obs(i, 2_000 if i % 2 else 2_000_000), subclass=1) for i in range(8)]
+
+    result = assess(target(100_000, subclass=0), pool, PriceAdjusters())
+
+    assert result.peer_group == "code"
+    assert any("товары разного класса" in x for x in result.limitations)

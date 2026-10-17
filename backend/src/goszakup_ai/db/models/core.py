@@ -2,14 +2,36 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import BigInteger, ForeignKey, Index, Integer, Numeric, SmallInteger, String, Text
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    SmallInteger,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import UserDefinedType
 
 from goszakup_ai.db.base import Base
 
 SCHEMA = {"schema": "core"}
 AMOUNT = Numeric(20, 4)
+
+
+class Vector(UserDefinedType[list[float]]):
+    cache_ok = True
+
+    def __init__(self, dim: int) -> None:
+        self.dim = dim
+
+    def get_col_spec(self, **kw: Any) -> str:
+        return f"vector({self.dim})"
 
 
 class Subject(Base):
@@ -306,3 +328,25 @@ class RefCpi(Base):
     nonfood_mom_pct: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
     services_mom_pct: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
     source_url: Mapped[str | None] = mapped_column(Text)
+
+
+class ItemText(Base):
+    __tablename__ = "item_text"
+    __table_args__ = SCHEMA
+
+    text_key: Mapped[str] = mapped_column(String(32), primary_key=True)
+    text: Mapped[str] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list[float]] = mapped_column(Vector(384))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ItemSubclass(Base):
+    __tablename__ = "item_subclass"
+    __table_args__ = SCHEMA
+
+    enstru_code: Mapped[str] = mapped_column(String(32), primary_key=True)
+    text_key: Mapped[str] = mapped_column(String(32), primary_key=True)
+    subclass: Mapped[int] = mapped_column(Integer)
+    label: Mapped[str] = mapped_column(Text)
+    method: Mapped[str] = mapped_column(Text)

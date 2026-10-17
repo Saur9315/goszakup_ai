@@ -4,14 +4,22 @@ import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import date
+from statistics import median
 from typing import Literal
 
 from pydantic import BaseModel
 
 from goszakup_ai.analytics.links import announce_url, contract_url
-from goszakup_ai.analytics.stats import robust_z_log, weighted_mean, weighted_quantile
+from goszakup_ai.analytics.stats import (
+    HETEROGENEOUS_MAD_LOG,
+    mad,
+    robust_z_log,
+    weighted_mean,
+    weighted_quantile,
+)
 
 Level = Literal["locality", "region", "national"]
+PeerGroup = Literal["subclass", "code"]
 Verdict = Literal["fair", "elevated", "overpriced", "underpriced", "insufficient_data"]
 
 RELIABLE_LINKS = frozenset({"direct", "version", "lot"})
@@ -42,6 +50,8 @@ class PriceObs:
     region_name: str | None
     locality_code: str | None
     trd_buy_id: int | None
+    subclass: int | None = None
+    similarity: float | None = None
 
 
 @dataclass
@@ -99,6 +109,9 @@ class Target(BaseModel):
     region_name: str | None = None
     locality_code: str | None = None
     locality_name: str | None = None
+    desc_key: str | None = None
+    subclass: int | None = None
+    subclass_label: str | None = None
 
 
 class Comparable(BaseModel):
@@ -111,6 +124,7 @@ class Comparable(BaseModel):
     price: float
     adjusted_price: float
     quantity: float
+    similarity: float | None
     contract_url: str | None
     announce_url: str | None
 
@@ -123,6 +137,7 @@ class Adjustments(BaseModel):
 
 class FairPriceResult(BaseModel):
     target: Target
+    peer_group: PeerGroup
     level: Level | None
     n: int
     n_customers: int
@@ -150,6 +165,26 @@ def _levels(target: Target) -> list[tuple[Level, Callable[[PriceObs], bool]]]:
         ("region", lambda o: bool(target.region_code) and o.region_code == target.region_code),
         ("national", lambda o: True),
     ]
+
+
+def _pick_level(
+    target: Target, group: Sequence[PriceObs], min_n: int
+) -> tuple[Level, list[PriceObs]]:
+    level: Level = "national"
+    chosen: list[PriceObs] = []
+    for name, matches in _levels(target):
+        level, chosen = name, [o for o in group if matches(o)]
+        if len(chosen) >= min_n:
+            break
+    return level, chosen
+
+
+def _log_median(group: Sequence[PriceObs]) -> float:
+    return float(median([math.log(o.price) for o in group])) if group else 0.0
+
+
+def _log_mad(group: Sequence[PriceObs]) -> float:
+    return mad([math.log(o.price) for o in group]) if len(group) >= 2 else 0.0
 
 
 def _verdict(deviation: float | None, n: int, params: FairPriceParams) -> Verdict:
@@ -183,6 +218,11 @@ def method_text(params: FairPriceParams) -> str:
     return (
         "Fair Price = взвешенная медиана цен аналогов (вес = √количества), цены без НДС "
         "за нормализованную единицу. Аналоги: тот же код ЕНС ТРУ и единица, другие заказчики. "
+        "Если у позиции есть описание из пункта плана, а под кодом товары разного класса, "
+        "берутся аналоги того же подкласса — близкие по смыслу описания (эмбеддинги "
+        f"multilingual-e5-small, кластеризация внутри кода): при N ≥ {params.min_n}, если медиана "
+        "подкласса отличается от медианы кода больше чем в 2 раза или цены по коду неоднородны "
+        "(MAD логарифма > 0.7), а подкласс однороднее. "
         f"Уровень выборки: город → регион → РК, первый уровень с N ≥ {params.min_n}. "
         "Поправки: инфляция по ИПЦ к месяцу оцениваемой закупки, сезонный коэффициент месяца, "
         "для уровня РК — региональный коэффициент цен. "
@@ -207,13 +247,16 @@ def assess(
         and o.customer_bin != target.customer_bin
         and (target.chain_id is None or o.chain_id != target.chain_id)
     ]
-    level: Level | None = None
-    chosen: list[PriceObs] = []
-    for name, matches in _levels(target):
-        chosen = [o for o in candidates if matches(o)]
-        level = name
-        if len(chosen) >= params.min_n:
-            break
+    code_mad = _log_mad(candidates)
+    similar = [
+        o for o in candidates if target.subclass is not None and o.subclass == target.subclass
+    ]
+    use_subclass = len(similar) >= params.min_n and (
+        abs(_log_median(similar) - _log_median(candidates)) > HETEROGENEOUS_MAD_LOG
+        or (code_mad > HETEROGENEOUS_MAD_LOG and _log_mad(similar) < code_mad)
+    )
+    peer_group: PeerGroup = "subclass" if use_subclass else "code"
+    level, chosen = _pick_level(target, similar if use_subclass else candidates, params.min_n)
 
     national = level == "national"
     adjusted = [
@@ -236,6 +279,7 @@ def assess(
         range(n),
         key=lambda i: (
             chosen[i].locality_code != target.locality_code,
+            -(chosen[i].similarity or 0.0),
             -(chosen[i].sign_date or date.min).toordinal(),
         ),
     )
@@ -250,6 +294,7 @@ def assess(
             price=round(chosen[i].price, 2),
             adjusted_price=round(adjusted[i], 2),
             quantity=chosen[i].quantity,
+            similarity=_round(chosen[i].similarity, 3),
             contract_url=contract_url(chosen[i].contract_id),
             announce_url=announce_url(chosen[i].trd_buy_id),
         )
@@ -257,6 +302,16 @@ def assess(
     ]
 
     limitations = []
+    if use_subclass:
+        limitations.append(
+            "Под кодом ЕНС ТРУ товары разного класса: аналоги взяты из подкласса с похожими "
+            "описаниями"
+        )
+    elif code_mad > HETEROGENEOUS_MAD_LOG:
+        limitations.append(
+            f"Цены по коду ЕНС ТРУ неоднородны (MAD логарифма = {code_mad:.2f}), а похожих по "
+            "описанию аналогов недостаточно: под одним кодом могут быть товары разного класса"
+        )
     if n < params.min_n:
         limitations.append(f"Мало сопоставимых закупок других заказчиков: N = {n} < {params.min_n}")
     if national and n:
@@ -276,6 +331,7 @@ def assess(
 
     return FairPriceResult(
         target=target,
+        peer_group=peer_group,
         level=level if n else None,
         n=n,
         n_customers=len({o.customer_bin for o in chosen}),

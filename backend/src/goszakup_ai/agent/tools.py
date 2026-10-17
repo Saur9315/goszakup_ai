@@ -299,6 +299,11 @@ async def price_anomaly(session: AsyncSession, p: ResolvedParams) -> ToolResult:
     facts = [
         fact("Порог отклонения от средневзвешенной", p.threshold, pct(p.threshold)),
         fact("Проверено позиций договоров", report.checked, num(report.checked)),
+        fact(
+            "Из них сравнены с похожими по описанию (подкласс)",
+            report.checked_by_subclass,
+            num(report.checked_by_subclass),
+        ),
         fact("Превышают порог (критерий ТЗ)", report.matched, num(report.matched)),
         fact("Подтверждено робастной статистикой (z > 2)", report.confirmed, num(report.confirmed)),
         fact("Оценка переплаты по подтверждённым", overpayment, money(overpayment)),
@@ -324,6 +329,7 @@ async def price_anomaly(session: AsyncSession, p: ResolvedParams) -> ToolResult:
             "deviation": pct(a.deviation, True),
             "z": num(a.robust_z, 2) if a.robust_z is not None else "—",
             "peers": num(a.peer_n),
+            "group": f"подкласс «{a.subclass_label}»" if a.subclass_label else "весь код",
             "overpayment": money(a.overpayment_kzt),
             "link": a.contract_url,
         }
@@ -349,6 +355,7 @@ async def price_anomaly(session: AsyncSession, p: ResolvedParams) -> ToolResult:
             ("deviation", "Отклонение"),
             ("z", "z"),
             ("peers", "N аналогов"),
+            ("group", "Группа сравнения"),
             ("overpayment", "Переплата"),
             ("link", "Договор"),
         ],
@@ -455,6 +462,13 @@ async def fair_price(session: AsyncSession, p: ResolvedParams) -> list[ToolResul
                 fact("Отклонение от Fair Price", r.deviation, pct(r.deviation, True)),
                 fact("Число аналогов", r.n, num(r.n)),
                 fact("Число заказчиков-аналогов", r.n_customers, num(r.n_customers)),
+                fact(
+                    "Группа аналогов",
+                    r.peer_group,
+                    f"подкласс «{t.subclass_label}» (похожие описания)"
+                    if r.peer_group == "subclass"
+                    else "все позиции кода ЕНС ТРУ",
+                ),
                 fact("Уровень выборки", r.level, LEVELS_RU.get(r.level or "", "—")),
                 fact("Вердикт", r.verdict, VERDICTS_RU[r.verdict]),
                 fact("Уверенность", r.confidence, f"{num(r.confidence, 2)} ({r.confidence_label})"),
@@ -475,6 +489,7 @@ async def fair_price(session: AsyncSession, p: ResolvedParams) -> list[ToolResul
                 {
                     "date": fmt_date(c.sign_date),
                     "customer": c.customer_name,
+                    "similarity": num(c.similarity, 2) if c.similarity is not None else "—",
                     "region": c.region_name,
                     "price": money(c.price),
                     "adjusted": money(c.adjusted_price),
@@ -493,6 +508,7 @@ async def fair_price(session: AsyncSession, p: ResolvedParams) -> list[ToolResul
                     columns=[
                         ("date", "Дата"),
                         ("customer", "Заказчик-аналог"),
+                        ("similarity", "Сходство описания"),
                         ("region", "Регион"),
                         ("price", "Цена"),
                         ("adjusted", "Цена с поправками"),

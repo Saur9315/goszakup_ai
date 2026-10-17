@@ -14,6 +14,7 @@ from goszakup_ai.analytics.fair_price import (
     Target,
     assess,
 )
+from goszakup_ai.transform.text import desc_text_sql
 
 POOL_LINKS = ("direct", "version", "lot", "customer_code")
 
@@ -39,7 +40,8 @@ SELECT unit_id, lot_id, lot_number, contract_id, chain_id, trd_buy_id, customer_
        customer_name, coalesce(item_name, enstru_name) AS item_name, enstru_code,
        unit_norm_code, unit_norm_name AS unit_name, unit_dimension, unit_comparable, plan_link,
        price_norm AS price, quantity_norm AS quantity, sign_date::date AS date,
-       region_code, region_name, locality_code, locality_name
+       region_code, region_name, locality_code, locality_name,
+       desc_key, subclass, subclass_label
 FROM mart.price_observation
 WHERE {where} AND enstru_code IS NOT NULL AND price_norm > 0 AND sign_date IS NOT NULL
 """
@@ -53,7 +55,9 @@ SELECT l.id AS lot_id, l.lot_number, l.trd_buy_id, l.customer_bin, s.name_ru AS 
        l.amount / nullif(l.quantity * coalesce(n.factor, 1), 0) AS price,
        l.quantity * coalesce(n.factor, 1) AS quantity,
        coalesce(t.publish_date, l.last_update_date)::date AS date,
-       {_KATO_COLUMNS}
+       {_KATO_COLUMNS},
+       md5({desc_text_sql("pp.extra_desc_ru")}) AS desc_key,
+       sc.subclass, sc.label AS subclass_label
 FROM core.lot l
 LEFT JOIN core.trd_buy t ON t.id = l.trd_buy_id
 LEFT JOIN core.subject s ON s.pid = l.customer_pid
@@ -69,17 +73,23 @@ LEFT JOIN LATERAL (
 ) kp ON true
 CROSS JOIN LATERAL (SELECT coalesce(kp.kato_code, s.kato_list[1]) AS kato_code) k
 {_KATO_JOINS}
+LEFT JOIN core.item_subclass sc
+       ON sc.enstru_code = pp.enstru_code
+      AND sc.text_key = md5({desc_text_sql("pp.extra_desc_ru")})
 WHERE l.id = :lot_id
 """
 
 POOL_SQL = """
-SELECT unit_id, contract_id, chain_id, customer_bin, customer_name, sign_date::date AS sign_date,
-       price_norm AS price, quantity_norm AS quantity, region_code, region_name, locality_code,
-       trd_buy_id
-FROM mart.price_observation
-WHERE enstru_code = :enstru_code AND unit_norm_code = :unit_norm_code
-  AND unit_comparable AND plan_link = ANY(:links)
-  AND price_norm > 0 AND quantity_norm > 0
+SELECT o.unit_id, o.contract_id, o.chain_id, o.customer_bin, o.customer_name,
+       o.sign_date::date AS sign_date, o.price_norm AS price, o.quantity_norm AS quantity,
+       o.region_code, o.region_name, o.locality_code, o.trd_buy_id, o.subclass,
+       1 - (it.embedding <=> te.embedding) AS similarity
+FROM mart.price_observation o
+LEFT JOIN core.item_text it ON it.text_key = o.desc_key
+LEFT JOIN core.item_text te ON te.text_key = CAST(:desc_key AS text)
+WHERE o.enstru_code = :enstru_code AND o.unit_norm_code = :unit_norm_code
+  AND o.unit_comparable AND o.plan_link = ANY(:links)
+  AND o.price_norm > 0 AND o.quantity_norm > 0
 """
 
 
@@ -103,10 +113,15 @@ async def load_adjusters(session: AsyncSession) -> PriceAdjusters:
     return PriceAdjusters(cpi=cpi, region_k=region_k, season=season)
 
 
-async def load_pool(session: AsyncSession, enstru_code: str, unit_norm_code: str) -> list[PriceObs]:
+async def load_pool(session: AsyncSession, target: Target) -> list[PriceObs]:
     rows = await session.execute(
         text(POOL_SQL),
-        {"enstru_code": enstru_code, "unit_norm_code": unit_norm_code, "links": list(POOL_LINKS)},
+        {
+            "enstru_code": target.enstru_code,
+            "unit_norm_code": target.unit_norm_code,
+            "desc_key": target.desc_key,
+            "links": list(POOL_LINKS),
+        },
     )
     return [
         PriceObs(
@@ -122,6 +137,8 @@ async def load_pool(session: AsyncSession, enstru_code: str, unit_norm_code: str
             region_name=r.region_name,
             locality_code=r.locality_code,
             trd_buy_id=r.trd_buy_id,
+            subclass=r.subclass,
+            similarity=float(r.similarity) if r.similarity is not None else None,
         )
         for r in rows
     ]
@@ -186,7 +203,7 @@ async def fair_price_for_lot(
     adjusters = await load_adjusters(session)
     results = []
     for target in await lot_targets(session, lot_id):
-        pool = await load_pool(session, target.enstru_code, target.unit_norm_code)
+        pool = await load_pool(session, target)
         results.append(assess(target, pool, adjusters, params))
     return results
 
@@ -195,5 +212,5 @@ async def fair_price_for_unit(
     session: AsyncSession, unit_id: int, params: FairPriceParams | None = None
 ) -> FairPriceResult:
     target = await unit_target(session, unit_id)
-    pool = await load_pool(session, target.enstru_code, target.unit_norm_code)
+    pool = await load_pool(session, target)
     return assess(target, pool, await load_adjusters(session), params)

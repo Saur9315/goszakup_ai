@@ -1,5 +1,8 @@
 from dataclasses import dataclass, field
 
+from goszakup_ai.analytics.stats import HETEROGENEOUS_MAD_LOG
+from goszakup_ai.transform.text import desc_text_sql
+
 
 @dataclass(frozen=True)
 class Mart:
@@ -9,6 +12,8 @@ class Mart:
 
 
 RELIABLE_PLAN_LINKS = "('direct', 'version', 'lot', 'customer_code')"
+MIN_SUBCLASS_PEERS = 5
+PP_DESC_KEY = f"md5({desc_text_sql('pp.extra_desc_ru')})"
 
 CONTRACT_CURRENT = Mart(
     "contract_current",
@@ -37,7 +42,7 @@ ENSTRU_UNIT = Mart(
 
 PRICE_OBSERVATION = Mart(
     "price_observation",
-    """
+    f"""
     WITH units AS (
         SELECT cu.*,
                cc.chain_id, cc.number_sys AS contract_number, cc.sign_date, cc.fin_year,
@@ -110,6 +115,9 @@ PRICE_OBSERVATION = Mart(
         coalesce(pp.name_ru, l.name_ru) AS item_name,
         coalesce(pp.name_clean, l.name_clean) AS item_name_clean,
         pp.desc_ru AS item_desc,
+        CASE WHEN pp.extra_desc_ru IS NOT NULL THEN {PP_DESC_KEY} END AS desc_key,
+        sc.subclass,
+        sc.label AS subclass_label,
         coalesce(pp.subject_type_id, r.contract_subject_type_id) AS subject_type_id,
         r.resolved_pp_id AS plan_point_id,
         CASE WHEN r.direct_id IS NOT NULL THEN 'direct'
@@ -151,6 +159,10 @@ PRICE_OBSERVATION = Mart(
     LEFT JOIN core.subject cust ON cust.pid = r.customer_pid
     LEFT JOIN core.subject sup ON sup.pid = r.supplier_pid
     LEFT JOIN meta.scope_bin sb ON sb.bin = r.customer_bin
+    LEFT JOIN core.item_subclass sc
+           ON sc.enstru_code = r.enstru_code
+          AND sc.text_key = {PP_DESC_KEY}
+          AND (r.direct_id IS NOT NULL OR r.version_id IS NOT NULL OR r.lot_pp_id IS NOT NULL)
     LEFT JOIN LATERAL (
         SELECT e.name_ru FROM core.ref_enstru e
         WHERE e.code = r.enstru_code ORDER BY e.id DESC LIMIT 1
@@ -433,18 +445,60 @@ PRICE_ANOMALY = Mart(
         FROM obs o JOIN grp g USING (enstru_code, unit_norm_code)
         GROUP BY 1, 2
     ),
+    sgrp AS (
+        SELECT enstru_code, unit_norm_code, subclass,
+               count(*) AS n,
+               count(DISTINCT customer_bin) AS n_customers,
+               sum(real_price * quantity_norm) AS spq,
+               sum(quantity_norm) AS sq,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY ln(real_price)) AS med_log
+        FROM obs WHERE subclass IS NOT NULL GROUP BY 1, 2, 3
+    ),
+    sdisp AS (
+        SELECT o.enstru_code, o.unit_norm_code, o.subclass,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY abs(ln(o.real_price) - g.med_log))
+                   AS mad_log
+        FROM obs o JOIN sgrp g USING (enstru_code, unit_norm_code, subclass)
+        GROUP BY 1, 2, 3
+    ),
     scored AS (
         SELECT o.*,
-               g.n - 1 AS peer_n,
-               g.n_customers,
-               (g.spq - o.real_price * o.quantity_norm) / nullif(g.sq - o.quantity_norm, 0)
+               x.peer_group,
+               x.n - 1 AS peer_n,
+               x.n_customers,
+               (x.spq - o.real_price * o.quantity_norm) / nullif(x.sq - o.quantity_norm, 0)
                    AS peer_wavg_real,
-               exp(g.med_log) AS group_median_real,
-               (ln(o.real_price) - g.med_log) / nullif(1.4826 * d.mad_log, 0) AS robust_z,
-               d.mad_log AS group_mad_log
+               exp(x.med_log) AS group_median_real,
+               (ln(o.real_price) - x.med_log) / nullif(1.4826 * x.mad_log, 0) AS robust_z,
+               x.mad_log AS group_mad_log
         FROM obs o
         JOIN grp g USING (enstru_code, unit_norm_code)
         JOIN disp d USING (enstru_code, unit_norm_code)
+        LEFT JOIN sgrp s
+               ON s.enstru_code = o.enstru_code AND s.unit_norm_code = o.unit_norm_code
+              AND s.subclass = o.subclass
+        LEFT JOIN sdisp sd
+               ON sd.enstru_code = o.enstru_code AND sd.unit_norm_code = o.unit_norm_code
+              AND sd.subclass = o.subclass
+        CROSS JOIN LATERAL (
+            SELECT coalesce(
+                       s.n > {MIN_SUBCLASS_PEERS} AND (
+                           abs(s.med_log - g.med_log) > {HETEROGENEOUS_MAD_LOG}
+                           OR (d.mad_log > {HETEROGENEOUS_MAD_LOG} AND sd.mad_log < d.mad_log)
+                       ),
+                       false
+                   ) AS use_subclass
+        ) u
+        CROSS JOIN LATERAL (
+            SELECT CASE WHEN u.use_subclass THEN 'subclass' ELSE 'code' END AS peer_group,
+                   CASE WHEN u.use_subclass THEN s.n ELSE g.n END AS n,
+                   CASE WHEN u.use_subclass THEN s.n_customers ELSE g.n_customers END
+                       AS n_customers,
+                   CASE WHEN u.use_subclass THEN s.spq ELSE g.spq END AS spq,
+                   CASE WHEN u.use_subclass THEN s.sq ELSE g.sq END AS sq,
+                   CASE WHEN u.use_subclass THEN s.med_log ELSE g.med_log END AS med_log,
+                   CASE WHEN u.use_subclass THEN sd.mad_log ELSE d.mad_log END AS mad_log
+        ) x
         WHERE o.in_scope
     )
     SELECT unit_id, contract_id, chain_id, lot_id, lot_number, trd_buy_id, contract_number,
@@ -453,6 +507,7 @@ PRICE_ANOMALY = Mart(
            plan_link, quantity_norm, price_norm, real_price, amount_kzt, region_name,
            locality_name, trade_method, is_single_source, cpi_idx IS NOT NULL AS cpi_adjusted,
            peer_n, n_customers, peer_wavg_real, group_median_real, robust_z, group_mad_log,
+           peer_group, subclass, subclass_label,
            real_price / nullif(peer_wavg_real, 0) - 1 AS deviation,
            (real_price - peer_wavg_real) * quantity_norm * coalesce(cpi_idx, 100) / 100
                AS overpayment_kzt

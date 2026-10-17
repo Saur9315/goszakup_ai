@@ -29,6 +29,8 @@ class Settings(BaseSettings):
 
     ingest_concurrency: int = 4
 
+    embedding_dir: Path = REPO_ROOT / "data" / "models"
+
     llm_provider: Literal["openai", "qwen", "gemini"] = "openai"
     llm_fallback_provider: Literal["openai", "qwen", "gemini"] | None = None
     llm_temperature: float = 0.0
