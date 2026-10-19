@@ -1,5 +1,6 @@
 from goszakup_ai.agent.graph import Agent, AgentState, template_draft
 from goszakup_ai.agent.prompts import history_block
+from goszakup_ai.agent.resolve import is_generic_item
 from goszakup_ai.agent.schemas import Fact, Turn, Verification
 
 
@@ -42,3 +43,10 @@ def test_after_verify_retries_once_on_unverified_numbers() -> None:
     assert after(object(), {**state, "llm_fallback": True}) == "remember"  # type: ignore[arg-type]
     clean: AgentState = {"verification": _verification([]), "attempts": 1}
     assert after(object(), clean) == "remember"  # type: ignore[arg-type]
+
+
+def test_generic_item_words_are_not_searched_as_goods() -> None:
+    for item in ("ТРУ", "ЕНС ТРУ", "количество ТРУ", "товары и услуги", "тауарлар"):
+        assert is_generic_item(item), item
+    for item in ("дизельное топливо", "услуги связи", "работы по ремонту кровли", "говядина"):
+        assert not is_generic_item(item), item

@@ -1,7 +1,7 @@
 {
   "model": "openai:gpt-4o",
-  "started_at": "2026-10-14T23:15:50.926881",
-  "data_as_of": "2026-10-14T16:19:57.151420Z",
+  "started_at": "2026-10-19T10:34:54.275722",
+  "data_as_of": "2026-10-19T05:17:20.725688Z",
   "cases": [
     {
       "id": "search-1",
@@ -44,15 +44,15 @@
           "in_narrative": false
         }
       ],
-      "numbers_total": 9,
-      "numbers_grounded": 9,
+      "numbers_total": 8,
+      "numbers_grounded": 8,
       "latencies_ms": [
-        3045
+        2344
       ],
-      "input_tokens": 3998,
-      "output_tokens": 155,
+      "input_tokens": 4664,
+      "output_tokens": 169,
       "run_ids": [
-        "1b94bdf9-7db3-4311-8fd5-675e9e3cf049"
+        "e3b059d1-5a2f-470a-835b-2dc47312209b"
       ],
       "error": null
     },
@@ -97,15 +97,15 @@
           "in_narrative": false
         }
       ],
-      "numbers_total": 10,
-      "numbers_grounded": 10,
+      "numbers_total": 9,
+      "numbers_grounded": 9,
       "latencies_ms": [
-        3503
+        2604
       ],
-      "input_tokens": 4012,
-      "output_tokens": 212,
+      "input_tokens": 4678,
+      "output_tokens": 152,
       "run_ids": [
-        "88f6aa1d-e10b-4e58-acea-e5dd2c2e4597"
+        "fa28a0e1-d1d4-40dd-98ca-7540c6aaf15a"
       ],
       "error": null
     },
@@ -153,12 +153,12 @@
       "numbers_total": 9,
       "numbers_grounded": 9,
       "latencies_ms": [
-        3547
+        3040
       ],
-      "input_tokens": 4002,
-      "output_tokens": 212,
+      "input_tokens": 4668,
+      "output_tokens": 216,
       "run_ids": [
-        "2ff0f4fc-d6b8-4ab5-8e04-5c6a2ef03161"
+        "db64226a-4500-46e8-b59f-95f13bddc1ab"
       ],
       "error": null
     },
@@ -193,7 +193,7 @@
           "kind": "text",
           "expected": "31.12.2025",
           "in_answer": true,
-          "in_narrative": false
+          "in_narrative": true
         },
         {
           "name": "БИН",
@@ -203,15 +203,15 @@
           "in_narrative": false
         }
       ],
-      "numbers_total": 7,
-      "numbers_grounded": 7,
+      "numbers_total": 8,
+      "numbers_grounded": 8,
       "latencies_ms": [
-        3399
+        3195
       ],
-      "input_tokens": 4010,
-      "output_tokens": 161,
+      "input_tokens": 4676,
+      "output_tokens": 158,
       "run_ids": [
-        "45280bb0-dff5-4941-a02f-26a4937d16b2"
+        "312e36f5-add3-4889-b5cf-795c43481d1d"
       ],
       "error": null
     },
@@ -256,15 +256,15 @@
           "in_narrative": false
         }
       ],
-      "numbers_total": 10,
-      "numbers_grounded": 10,
+      "numbers_total": 9,
+      "numbers_grounded": 9,
       "latencies_ms": [
-        2408
+        2164
       ],
-      "input_tokens": 4010,
-      "output_tokens": 181,
+      "input_tokens": 4676,
+      "output_tokens": 176,
       "run_ids": [
-        "495c1265-72c3-409b-9e74-b2aa71419d25"
+        "8aa04472-c2d1-4f16-8832-f9c72f5caba3"
       ],
       "error": null
     },
@@ -309,15 +309,15 @@
           "in_narrative": false
         }
       ],
-      "numbers_total": 9,
-      "numbers_grounded": 9,
+      "numbers_total": 8,
+      "numbers_grounded": 8,
       "latencies_ms": [
-        3363
+        2016
       ],
-      "input_tokens": 4003,
-      "output_tokens": 171,
+      "input_tokens": 4669,
+      "output_tokens": 164,
       "run_ids": [
-        "81926efb-379e-4a1a-a69b-1eee31a2a9ef"
+        "0a4b165a-61d2-4460-8c98-428df8506e8f"
       ],
       "error": null
     },
@@ -365,12 +365,12 @@
       "numbers_total": 10,
       "numbers_grounded": 10,
       "latencies_ms": [
-        2856
+        2008
       ],
-      "input_tokens": 3997,
-      "output_tokens": 156,
+      "input_tokens": 4663,
+      "output_tokens": 158,
       "run_ids": [
-        "dbaa6aa4-9270-4589-a48e-14e2546f2899"
+        "6268efb3-778e-41e5-8b74-edcde5d9db14"
       ],
       "error": null
     },
@@ -394,15 +394,15 @@
           "in_narrative": true
         }
       ],
-      "numbers_total": 9,
-      "numbers_grounded": 9,
+      "numbers_total": 8,
+      "numbers_grounded": 8,
       "latencies_ms": [
-        2742
+        2401
       ],
-      "input_tokens": 4127,
-      "output_tokens": 212,
+      "input_tokens": 4793,
+      "output_tokens": 201,
       "run_ids": [
-        "ec850003-77d0-4161-80ac-da212be091ef"
+        "00c97cae-f349-4cc9-8e7c-e5b193c370e6"
       ],
       "error": null
     },
@@ -429,12 +429,12 @@
       "numbers_total": 9,
       "numbers_grounded": 9,
       "latencies_ms": [
-        2715
+        2021
       ],
-      "input_tokens": 4141,
-      "output_tokens": 201,
+      "input_tokens": 4807,
+      "output_tokens": 168,
       "run_ids": [
-        "f820161a-b90d-4b46-b0b4-2eac7285ddb3"
+        "2389906a-5646-420f-8952-e408c2963a44"
       ],
       "error": null
     },
@@ -458,15 +458,15 @@
           "in_narrative": true
         }
       ],
-      "numbers_total": 10,
-      "numbers_grounded": 10,
+      "numbers_total": 12,
+      "numbers_grounded": 12,
       "latencies_ms": [
-        2687
+        2308
       ],
-      "input_tokens": 4136,
-      "output_tokens": 190,
+      "input_tokens": 4802,
+      "output_tokens": 217,
       "run_ids": [
-        "ab930ba1-acb4-4509-be40-d3c6f5e4705f"
+        "669d663c-2a3e-4472-9740-2fcc46e0346b"
       ],
       "error": null
     },
@@ -490,15 +490,15 @@
           "in_narrative": true
         }
       ],
-      "numbers_total": 11,
-      "numbers_grounded": 11,
+      "numbers_total": 9,
+      "numbers_grounded": 9,
       "latencies_ms": [
-        3299
+        2127
       ],
-      "input_tokens": 4136,
-      "output_tokens": 217,
+      "input_tokens": 4802,
+      "output_tokens": 198,
       "run_ids": [
-        "4ec29f5c-c962-48f6-a3d5-d3fde9667ba4"
+        "1912ae17-dcfc-4024-8949-43d07db5a58d"
       ],
       "error": null
     },
@@ -525,12 +525,12 @@
       "numbers_total": 8,
       "numbers_grounded": 8,
       "latencies_ms": [
-        3299
+        2234
       ],
-      "input_tokens": 4124,
-      "output_tokens": 182,
+      "input_tokens": 4790,
+      "output_tokens": 167,
       "run_ids": [
-        "603c365c-1312-4166-9f43-c8f2c5d7ac19"
+        "98e312c4-d5c4-4434-9cbf-41d8b4671466"
       ],
       "error": null
     },
@@ -578,12 +578,12 @@
       "numbers_total": 11,
       "numbers_grounded": 11,
       "latencies_ms": [
-        2967
+        2280
       ],
-      "input_tokens": 4211,
-      "output_tokens": 222,
+      "input_tokens": 4877,
+      "output_tokens": 220,
       "run_ids": [
-        "1cd5f307-b7ca-4280-aa6e-d7129a7e60ae"
+        "6d379eb0-87c4-4eaa-b991-a19116b46fbe"
       ],
       "error": null
     },
@@ -628,15 +628,15 @@
           "in_narrative": true
         }
       ],
-      "numbers_total": 11,
-      "numbers_grounded": 11,
+      "numbers_total": 10,
+      "numbers_grounded": 10,
       "latencies_ms": [
-        3430
+        2287
       ],
-      "input_tokens": 4201,
-      "output_tokens": 313,
+      "input_tokens": 4867,
+      "output_tokens": 242,
       "run_ids": [
-        "daa36dba-3ce8-432f-ba31-0b0e74cd8275"
+        "b9a349c1-7a72-4b6d-b8f3-9793a003c14c"
       ],
       "error": null
     },
@@ -684,12 +684,12 @@
       "numbers_total": 11,
       "numbers_grounded": 11,
       "latencies_ms": [
-        3046
+        2287
       ],
-      "input_tokens": 4235,
-      "output_tokens": 230,
+      "input_tokens": 4901,
+      "output_tokens": 228,
       "run_ids": [
-        "e6196660-6ffc-46ff-8dd0-445537bea00f"
+        "e35c327a-892f-466b-805d-e55931945d65"
       ],
       "error": null
     },
@@ -715,27 +715,27 @@
         {
           "name": "превышают порог",
           "kind": "count",
-          "expected": "265",
+          "expected": "260",
           "in_answer": true,
           "in_narrative": true
         },
         {
           "name": "подтверждено",
           "kind": "count",
-          "expected": "55",
+          "expected": "49",
           "in_answer": true,
           "in_narrative": true
         }
       ],
-      "numbers_total": 16,
-      "numbers_grounded": 16,
+      "numbers_total": 11,
+      "numbers_grounded": 11,
       "latencies_ms": [
-        2843
+        2485
       ],
-      "input_tokens": 4428,
-      "output_tokens": 255,
+      "input_tokens": 5118,
+      "output_tokens": 251,
       "run_ids": [
-        "610dbfd6-ce7c-4423-ad4b-9bb4f72795c0"
+        "ac5e08bc-36e7-4377-9c88-4d1275933f3e"
       ],
       "error": null
     },
@@ -754,21 +754,21 @@
         {
           "name": "проверено",
           "kind": "count",
-          "expected": "4434",
+          "expected": "4448",
           "in_answer": true,
           "in_narrative": true
         },
         {
           "name": "превышают порог",
           "kind": "count",
-          "expected": "2015",
+          "expected": "1832",
           "in_answer": true,
           "in_narrative": true
         },
         {
           "name": "подтверждено",
           "kind": "count",
-          "expected": "522",
+          "expected": "494",
           "in_answer": true,
           "in_narrative": true
         }
@@ -776,12 +776,12 @@
       "numbers_total": 15,
       "numbers_grounded": 15,
       "latencies_ms": [
-        3539
+        2877
       ],
-      "input_tokens": 4488,
-      "output_tokens": 285,
+      "input_tokens": 5197,
+      "output_tokens": 276,
       "run_ids": [
-        "59b7bdbd-ea8a-43f8-8983-9586990ea83f"
+        "7a7edd0c-a085-41fe-8fb9-d24c8bc7d40f"
       ],
       "error": null
     },
@@ -800,34 +800,34 @@
         {
           "name": "проверено",
           "kind": "count",
-          "expected": "18787",
+          "expected": "18855",
           "in_answer": true,
           "in_narrative": true
         },
         {
           "name": "превышают порог",
           "kind": "count",
-          "expected": "6996",
+          "expected": "6449",
           "in_answer": true,
           "in_narrative": true
         },
         {
           "name": "подтверждено",
           "kind": "count",
-          "expected": "1373",
+          "expected": "1343",
           "in_answer": true,
           "in_narrative": true
         }
       ],
-      "numbers_total": 18,
-      "numbers_grounded": 18,
+      "numbers_total": 11,
+      "numbers_grounded": 11,
       "latencies_ms": [
-        4600
+        2656
       ],
-      "input_tokens": 4464,
-      "output_tokens": 306,
+      "input_tokens": 5156,
+      "output_tokens": 231,
       "run_ids": [
-        "b1d1ab9f-87a8-41b4-acf1-f8c231ab9e08"
+        "24f5faed-ffe9-4b22-9ae4-8ccaf276aa40"
       ],
       "error": null
     },
@@ -853,27 +853,27 @@
         {
           "name": "превышают порог",
           "kind": "count",
-          "expected": "265",
+          "expected": "260",
           "in_answer": true,
           "in_narrative": true
         },
         {
           "name": "подтверждено",
           "kind": "count",
-          "expected": "55",
+          "expected": "49",
           "in_answer": true,
           "in_narrative": true
         }
       ],
-      "numbers_total": 12,
-      "numbers_grounded": 12,
+      "numbers_total": 16,
+      "numbers_grounded": 16,
       "latencies_ms": [
-        3037
+        2900
       ],
-      "input_tokens": 4432,
-      "output_tokens": 223,
+      "input_tokens": 5122,
+      "output_tokens": 253,
       "run_ids": [
-        "c078dcee-9cda-4248-9cf1-eafb8fd6f95e"
+        "53b526db-0a09-4c28-9af5-51c3edcd611f"
       ],
       "error": null
     },
@@ -897,29 +897,36 @@
           "in_narrative": true
         },
         {
-          "name": "нетипичный рост",
+          "name": "рост выше порога",
           "kind": "count",
           "expected": "191",
+          "in_answer": true,
+          "in_narrative": false
+        },
+        {
+          "name": "подтверждено моделью",
+          "kind": "count",
+          "expected": "15",
           "in_answer": true,
           "in_narrative": true
         },
         {
           "name": "рост #1",
           "kind": "number",
-          "expected": "2.62",
+          "expected": "17.36",
           "in_answer": true,
-          "in_narrative": false
+          "in_narrative": true
         }
       ],
-      "numbers_total": 12,
-      "numbers_grounded": 12,
+      "numbers_total": 17,
+      "numbers_grounded": 17,
       "latencies_ms": [
-        3212
+        2988
       ],
-      "input_tokens": 4616,
-      "output_tokens": 211,
+      "input_tokens": 5318,
+      "output_tokens": 262,
       "run_ids": [
-        "01c45fc5-3e02-4875-ac1d-d8feb0500380"
+        "9f616375-ec09-4224-913d-36fce2f3c8c2"
       ],
       "error": null
     },
@@ -938,34 +945,41 @@
         {
           "name": "проверено пар",
           "kind": "count",
-          "expected": "2327",
+          "expected": "2337",
           "in_answer": true,
           "in_narrative": true
         },
         {
-          "name": "нетипичный рост",
+          "name": "рост выше порога",
           "kind": "count",
-          "expected": "817",
+          "expected": "821",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
+          "name": "подтверждено моделью",
+          "kind": "count",
+          "expected": "97",
           "in_answer": true,
           "in_narrative": false
         },
         {
           "name": "рост #1",
           "kind": "number",
-          "expected": "3.33",
+          "expected": "6.44",
           "in_answer": true,
-          "in_narrative": true
+          "in_narrative": false
         }
       ],
       "numbers_total": 13,
       "numbers_grounded": 13,
       "latencies_ms": [
-        3953
+        3190
       ],
-      "input_tokens": 4541,
-      "output_tokens": 282,
+      "input_tokens": 5219,
+      "output_tokens": 275,
       "run_ids": [
-        "511981f3-4473-4384-8768-852cf037d34b"
+        "5b6a2f65-8d7b-4e33-8c80-4483c5ece1b5"
       ],
       "error": null
     },
@@ -984,34 +998,41 @@
         {
           "name": "проверено пар",
           "kind": "count",
-          "expected": "372",
+          "expected": "370",
           "in_answer": true,
           "in_narrative": true
         },
         {
-          "name": "нетипичный рост",
+          "name": "рост выше порога",
           "kind": "count",
-          "expected": "70",
+          "expected": "72",
           "in_answer": true,
           "in_narrative": false
         },
         {
+          "name": "подтверждено моделью",
+          "kind": "count",
+          "expected": "5",
+          "in_answer": true,
+          "in_narrative": true
+        },
+        {
           "name": "рост #1",
           "kind": "number",
-          "expected": "8.84",
+          "expected": "32.0",
           "in_answer": true,
           "in_narrative": true
         }
       ],
-      "numbers_total": 16,
-      "numbers_grounded": 16,
+      "numbers_total": 12,
+      "numbers_grounded": 12,
       "latencies_ms": [
-        3202
+        3210
       ],
-      "input_tokens": 4485,
-      "output_tokens": 252,
+      "input_tokens": 5277,
+      "output_tokens": 263,
       "run_ids": [
-        "f77538ce-fce4-4720-b308-e744deb63ebb"
+        "2b18d236-22b4-4b34-9bfe-22f43b32c80d"
       ],
       "error": null
     },
@@ -1051,27 +1072,27 @@
         {
           "name": "Fair Price",
           "kind": "money",
-          "expected": "88830.29",
+          "expected": "88780.61",
           "in_answer": true,
           "in_narrative": true
         },
         {
           "name": "отклонение",
           "kind": "pct",
-          "expected": "804.4584",
+          "expected": "804.9091",
           "in_answer": true,
           "in_narrative": true
         }
       ],
-      "numbers_total": 9,
-      "numbers_grounded": 9,
+      "numbers_total": 13,
+      "numbers_grounded": 13,
       "latencies_ms": [
-        4808
+        2927
       ],
-      "input_tokens": 5373,
-      "output_tokens": 353,
+      "input_tokens": 5014,
+      "output_tokens": 273,
       "run_ids": [
-        "4ececb23-45db-41d1-adb3-ad01b419130d"
+        "aba3b4ce-e263-409a-b98c-584b8e20d7d0"
       ],
       "error": null
     },
@@ -1126,12 +1147,12 @@
       "numbers_total": 13,
       "numbers_grounded": 13,
       "latencies_ms": [
-        2762
+        2358
       ],
-      "input_tokens": 4291,
-      "output_tokens": 193,
+      "input_tokens": 4976,
+      "output_tokens": 216,
       "run_ids": [
-        "eddd84f0-3994-4ae7-bd60-cb3eed7df587"
+        "9cea7052-7121-4e9d-919b-7871a1bc92d6"
       ],
       "error": null
     },
@@ -1164,34 +1185,34 @@
         {
           "name": "число аналогов",
           "kind": "count",
-          "expected": "153",
+          "expected": "156",
           "in_answer": true,
           "in_narrative": true
         },
         {
           "name": "Fair Price",
           "kind": "money",
-          "expected": "3171.64",
+          "expected": "3143.31",
           "in_answer": true,
           "in_narrative": true
         },
         {
           "name": "отклонение",
           "kind": "pct",
-          "expected": "-0.0068",
+          "expected": "0.0021",
           "in_answer": true,
           "in_narrative": true
         }
       ],
-      "numbers_total": 14,
-      "numbers_grounded": 14,
+      "numbers_total": 16,
+      "numbers_grounded": 16,
       "latencies_ms": [
-        2765
+        2719
       ],
-      "input_tokens": 4232,
-      "output_tokens": 216,
+      "input_tokens": 4917,
+      "output_tokens": 211,
       "run_ids": [
-        "935c5e3f-67c4-4245-9df4-fb40cdb8ccf2"
+        "5e93d217-a86d-4f43-a086-9031d4d958a6"
       ],
       "error": null
     },
@@ -1224,21 +1245,21 @@
         {
           "name": "число аналогов",
           "kind": "count",
-          "expected": "140",
+          "expected": "5",
           "in_answer": true,
           "in_narrative": true
         },
         {
           "name": "Fair Price",
           "kind": "money",
-          "expected": "6513324.09",
+          "expected": "5749139.6",
           "in_answer": true,
           "in_narrative": true
         },
         {
           "name": "отклонение",
           "kind": "pct",
-          "expected": "0.3035",
+          "expected": "0.4767",
           "in_answer": true,
           "in_narrative": true
         }
@@ -1246,12 +1267,12 @@
       "numbers_total": 13,
       "numbers_grounded": 13,
       "latencies_ms": [
-        2805
+        2684
       ],
-      "input_tokens": 4259,
-      "output_tokens": 205,
+      "input_tokens": 4928,
+      "output_tokens": 232,
       "run_ids": [
-        "ae7f708c-d335-41d1-ad55-192eaca9ac75"
+        "393068e1-ccfd-4a0c-896f-966b4bc2ef0f"
       ],
       "error": null
     },
@@ -1284,34 +1305,34 @@
         {
           "name": "число аналогов",
           "kind": "count",
-          "expected": "24",
+          "expected": "23",
           "in_answer": true,
           "in_narrative": true
         },
         {
           "name": "Fair Price",
           "kind": "money",
-          "expected": "254955.52",
+          "expected": "254668.69",
           "in_answer": true,
           "in_narrative": true
         },
         {
           "name": "отклонение",
           "kind": "pct",
-          "expected": "173.3284",
+          "expected": "173.5248",
           "in_answer": true,
           "in_narrative": true
         }
       ],
-      "numbers_total": 11,
-      "numbers_grounded": 11,
+      "numbers_total": 15,
+      "numbers_grounded": 15,
       "latencies_ms": [
-        4052
+        4521
       ],
-      "input_tokens": 4298,
-      "output_tokens": 213,
+      "input_tokens": 6198,
+      "output_tokens": 391,
       "run_ids": [
-        "7e6e83c8-674c-48ed-b97d-5701a6cc91a3"
+        "a4b68e86-574b-4540-84d5-3de65c24c55c"
       ],
       "error": null
     },
@@ -1335,17 +1356,17 @@
           "in_narrative": true
         }
       ],
-      "numbers_total": 9,
-      "numbers_grounded": 9,
+      "numbers_total": 13,
+      "numbers_grounded": 13,
       "latencies_ms": [
-        2715,
-        2459
+        2184,
+        2283
       ],
-      "input_tokens": 8379,
-      "output_tokens": 322,
+      "input_tokens": 9711,
+      "output_tokens": 363,
       "run_ids": [
-        "3416aa65-193c-478d-82b0-db458e065205",
-        "f2abad5d-85ff-4c39-b121-6f63b511f36d"
+        "3b3c11f4-f2c6-4a3a-a698-555becc2d675",
+        "aa9d4dcc-3171-496d-9ad2-694a5a217653"
       ],
       "error": null
     },
@@ -1379,14 +1400,14 @@
       "numbers_total": 8,
       "numbers_grounded": 8,
       "latencies_ms": [
-        2391,
-        2533
+        2437,
+        2177
       ],
-      "input_tokens": 8062,
-      "output_tokens": 296,
+      "input_tokens": 9394,
+      "output_tokens": 301,
       "run_ids": [
-        "a7093f2a-ea28-47b8-a415-0bb808eca80f",
-        "8bb9a3d5-44ee-4865-a930-792f813f2203"
+        "72b43d68-0937-4486-8d05-2497ed102f7e",
+        "54e578b7-1573-4a5d-bc6f-5f83a1074e4d"
       ],
       "error": null
     },
@@ -1438,17 +1459,17 @@
           "in_narrative": true
         }
       ],
-      "numbers_total": 14,
-      "numbers_grounded": 14,
+      "numbers_total": 17,
+      "numbers_grounded": 17,
       "latencies_ms": [
-        1065,
-        3224
+        828,
+        2863
       ],
-      "input_tokens": 7691,
-      "output_tokens": 297,
+      "input_tokens": 9042,
+      "output_tokens": 311,
       "run_ids": [
-        "dff81cdb-8d8f-429d-b5e9-f8f60415fa72",
-        "4064d251-f734-4ae7-acdb-fb3e8df6999a"
+        "2733e57b-c946-4c1a-9ebf-8ee6ee5ddf28",
+        "fe8d56d0-000b-4e27-83c7-1aeb508ded8f"
       ],
       "error": null
     },
@@ -1467,12 +1488,12 @@
       "numbers_total": 0,
       "numbers_grounded": 0,
       "latencies_ms": [
-        1031
+        948
       ],
-      "input_tokens": 3202,
-      "output_tokens": 42,
+      "input_tokens": 3868,
+      "output_tokens": 43,
       "run_ids": [
-        "56668bbc-7ec1-44f8-b5fe-f27a13cdd85f"
+        "61d468c5-4ca2-4a9a-94ed-fceff91ee66c"
       ],
       "error": null
     },
@@ -1491,12 +1512,12 @@
       "numbers_total": 0,
       "numbers_grounded": 0,
       "latencies_ms": [
-        1182
+        726
       ],
-      "input_tokens": 3203,
+      "input_tokens": 3869,
       "output_tokens": 43,
       "run_ids": [
-        "ceecbbaa-0f1b-46bd-bf47-d46aa5a3732d"
+        "02df9eae-b13e-468c-971f-14b66e5b1edf"
       ],
       "error": null
     },
@@ -1515,12 +1536,12 @@
       "numbers_total": 0,
       "numbers_grounded": 0,
       "latencies_ms": [
-        1062
+        804
       ],
-      "input_tokens": 3205,
+      "input_tokens": 3871,
       "output_tokens": 43,
       "run_ids": [
-        "fe160061-5ceb-4e6a-b2b9-076d917e165e"
+        "ab2041d2-634e-4f6e-87e7-cea70c15c850"
       ],
       "error": null
     }
@@ -1529,18 +1550,18 @@
     "cases": 33,
     "questions": 36,
     "errors": 0,
-    "facts": 99,
+    "facts": 102,
     "fact_accuracy": 1.0,
-    "narrative_fact_accuracy": 0.898989898989899,
+    "narrative_fact_accuracy": 0.9019607843137255,
     "intent_accuracy": 1.0,
     "kind_accuracy": 1.0,
     "bins_accuracy": 1.0,
     "lots_accuracy": 1.0,
     "years_accuracy": 1.0,
     "grounding": 1.0,
-    "latency_p50_ms": 3002.0,
-    "latency_p95_ms": 4052,
-    "input_tokens": 148992,
-    "output_tokens": 7052
+    "latency_p50_ms": 2351.0,
+    "latency_p95_ms": 3195,
+    "input_tokens": 173528,
+    "output_tokens": 7072
   }
 }

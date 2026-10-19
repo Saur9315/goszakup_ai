@@ -59,4 +59,5 @@ async def refresh_marts(engine: AsyncEngine) -> None:
         for mart in MARTS:
             started = time.monotonic()
             await conn.execute(text(f"REFRESH MATERIALIZED VIEW mart.{mart.name}"))
+            await conn.execute(text(f"ANALYZE mart.{mart.name}"))
             log.info("mart.%s refreshed in %.1fs", mart.name, time.monotonic() - started)

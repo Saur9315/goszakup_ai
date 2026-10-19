@@ -9,6 +9,25 @@ from goszakup_ai.agent.schemas import QuestionAnalysis, ResolvedParams
 from goszakup_ai.core.scope import TARGET_YEARS
 
 BIN_RE = re.compile(r"\b\d{12}\b")
+WORD_RE = re.compile(r"\w+")
+GENERIC_STEMS = (
+    "тру",
+    "енс",
+    "енстру",
+    "товар",
+    "работ",
+    "услуг",
+    "закуп",
+    "количеств",
+    "объем",
+    "объём",
+    "позиц",
+    "продукц",
+    "тауар",
+    "қызмет",
+    "жұмыс",
+    "сатып",
+)
 LOT_RE = re.compile(r"\b\d{5,10}-[A-ZА-ЯЁ]+(?:-[A-ZА-ЯЁ]+)*\d+\b")
 
 ITEM_SQL = """
@@ -51,6 +70,11 @@ async def _known_bins(session: AsyncSession, bins: list[str]) -> dict[str, str]:
     return {r.b: r.name_ru or "" for r in rows}
 
 
+def is_generic_item(item: str) -> bool:
+    words = [w for w in WORD_RE.findall(item.lower()) if len(w) > 2]
+    return all(w.startswith(GENERIC_STEMS) for w in words)
+
+
 async def _items_to_codes(session: AsyncSession, item: str) -> list[str]:
     rows = (await session.execute(text(ITEM_SQL), {"q": item.lower()})).all()
     if not rows:
@@ -75,8 +99,9 @@ async def resolve(
 
     lots = list(dict.fromkeys([*LOT_RE.findall(question), *analysis.lot_numbers]))
 
+    items = [i for i in analysis.items if not is_generic_item(i)]
     codes: list[str] = []
-    for item in analysis.items:
+    for item in items:
         found = await _items_to_codes(session, item)
         if found:
             codes.extend(c for c in found if c not in codes)
@@ -108,7 +133,7 @@ async def resolve(
         customer_names=known,
         enstru_codes=codes,
         enstru_names=names,
-        items=analysis.items,
+        items=items,
         lot_numbers=lots,
         years=years,
         region_code=region_code,

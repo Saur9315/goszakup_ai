@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from goszakup_ai.agent.schemas import Fact, Language, ResolvedParams, ToolResult, Turn
 
-PROMPT_VERSION = "2026-10-14.3"
+PROMPT_VERSION = "2026-10-19.2"
 HISTORY_TURNS = 3
 
 UNDERSTAND_SYSTEM = """\
